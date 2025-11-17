@@ -1,0 +1,73 @@
+# ----------------------------
+# Global ignores
+# ----------------------------
+*.log
+*.tmp
+*.temp
+*.lock
+*.cache
+.DS_Store
+Thumbs.db
+
+# ----------------------------
+# Environment files (DO NOT upload)
+# ----------------------------
+.env
+.env.local
+.env.*.local
+
+# ----------------------------
+# Node.js / Frontend (React / Vite)
+# ----------------------------
+node_modules/
+dist/
+build/
+.cache/
+.vite/
+.next/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ignore frontend build files
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# ----------------------------
+# Python / Django / Backend
+# ----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+env/
+venv/
+venv*/
+ENV/
+*.sqlite3
+db.sqlite3
+.pytest_cache/
+coverage/
+
+# Django specific
+staticfiles/
+media/
+
+# ignore backend environment
+backend/.env
+backend/env/
+backend/venv/
+backend/__pycache__/
+
+# ----------------------------
+# IDE / Editor files
+# ----------------------------
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# ----------------------------
+# Git
+# ----------------------------
