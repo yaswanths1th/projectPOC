@@ -40,7 +40,6 @@ export default function Dashboard() {
 
       const dataAddr = await resAddr.json();
       setAddressExists(dataAddr.has_address);
-
     } catch (error) {
       console.error("User dashboard load error:", error);
     } finally {
@@ -70,21 +69,36 @@ export default function Dashboard() {
 
           <div className="stats-cards">
 
-            <div className="stat-card">
+            {/* 🔵 Profile Card → Redirect to Profile Page */}
+            <div
+              className="stat-card"
+              onClick={() => navigate("/profile")}
+              style={{ cursor: "pointer" }}
+            >
               <div className="stat-info">
                 <h2>{profile?.email ? "✓" : "—"}</h2>
                 <p>Profile Completed</p>
               </div>
             </div>
 
-            <div className="stat-card">
+            {/* 🔵 Address Card → Redirect to Address Page */}
+            <div
+              className="stat-card"
+              onClick={() => navigate("/addresses")}
+              style={{ cursor: "pointer" }}
+            >
               <div className="stat-info">
                 <h2>{addressExists ? "✓" : "—"}</h2>
                 <p>Address Added</p>
               </div>
             </div>
 
-            <div className="stat-card">
+            {/* 🔵 Status Card → Redirect to Profile Page */}
+            <div
+              className="stat-card"
+              onClick={() => navigate("/profile")}
+              style={{ cursor: "pointer" }}
+            >
               <div className="stat-info">
                 <h2>{profile?.is_active ? "Active" : "Inactive"}</h2>
                 <p>Account Status</p>

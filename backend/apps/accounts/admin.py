@@ -1,6 +1,7 @@
 # ✅ apps/accounts/admin.py
 from django.contrib import admin
 from .models import User, Department, Role, UserError, UserInformation, UserValidation
+from .admin_permissions import *
 
 
 @admin.register(Department)

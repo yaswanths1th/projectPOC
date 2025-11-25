@@ -22,6 +22,7 @@ urlpatterns = [
 
     # 👤 User profile & Admin user management
     path("api/viewprofile/", include("apps.viewprofile.urls")),
+     path('api/permissions/', include('apps.accounts.urls_permissions')),  # <- new
 
     
 ]

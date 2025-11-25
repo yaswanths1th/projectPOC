@@ -116,28 +116,39 @@ function LoginPage() {
 
       // Navigate after a short delay to let the success message render
       setTimeout(async () => {
-        if (data.is_admin) {
-          navigate("/admin/dashboard", { replace: true });
-          return;
-        }
-        try {
-          const addrRes = await fetch("http://127.0.0.1:8000/api/addresses/check/", {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          const addrData = await addrRes.json().catch(() => ({}));
-          if (addrRes.ok && addrData.has_address) {
-            navigate("/dashboard", { replace: true });
-          } else {
-            navigate("/addresses", { replace: true });
-          }
-        } catch {
-          navigate("/addresses", { replace: true });
-        }
-      }, 700);
+  // Always parse role_id safely
+  const roleId = parseInt(data.role_id, 10);
+
+  // Admin redirect rule:
+  // If role_id exists AND is not equal to 2 → admin dashboard
+  if (!isNaN(roleId) && roleId !== 2) {
+    navigate("/admin/dashboard", { replace: true });
+    return;
+  }
+
+  // Otherwise → user dashboard flow
+  try {
+    const addrRes = await fetch("http://127.0.0.1:8000/api/addresses/check/", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const addrData = await addrRes.json().catch(() => ({}));
+
+    if (addrRes.ok && addrData.has_address) {
+      navigate("/dashboard", { replace: true });
+    } else {
+      navigate("/addresses", { replace: true });
+    }
+  } catch {
+    navigate("/addresses", { replace: true });
+  }
+}, 700);
+
+
     } catch {
   const fallback =
     getErrorText(FALLBACK_CODES.SERVER_ERROR) ||

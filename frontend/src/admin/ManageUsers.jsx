@@ -5,13 +5,50 @@ import { Edit2, Trash2 } from "lucide-react";
 import "./ManageUsers.css";
 
 function ManageUsers() {
+
+  // ==========================
+  // 🔥 RBAC PERMISSIONS STATES
+  // ==========================
+  const [canAdd, setCanAdd] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
+  const [canDelete, setCanDelete] = useState(false);
+
+  const token = localStorage.getItem("access");
+
+  const checkPermission = async (codename) => {
+    try {
+      const res = await axios.get(
+        "http://127.0.0.1:8000/api/permissions/has_permission/",
+        {
+          params: { codename },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      return res.data?.has === true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Call only once
+  useEffect(() => {
+    (async () => {
+      setCanAdd(await checkPermission("add_user"));
+      setCanEdit(await checkPermission("edit_user"));
+      setCanDelete(await checkPermission("delete_user"));
+    })();
+  }, []);
+
+  // ==========================
+  // EXISTING STATES
+  // ==========================
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   const location = useLocation();
   const initialStatusFilter = location.state?.statusFilter || "All Status";
-  const updateMessage = location.state?.updateMessage;   // 🔥 From edit user page
+  const updateMessage = location.state?.updateMessage;
 
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [roleFilter, setRoleFilter] = useState("All Roles");
@@ -23,38 +60,37 @@ function ManageUsers() {
   const [currentPage, setCurrentPage] = useState(1);
   const usersPerPage = 10;
 
-  const token = localStorage.getItem("access");
   const navigate = useNavigate();
 
-  // 🔥 Toast (BOTTOM)
-const showToast = (msg, type = "success") => {
-  let wrapper = document.querySelector(".toast-wrapper");
+  // ======================
+  // 🔥 Toast (Same as before)
+  // ======================
+  const showToast = (msg, type = "success") => {
+    let wrapper = document.querySelector(".toast-wrapper");
 
-  if (!wrapper) {
-    wrapper = document.createElement("div");
-    wrapper.className = "toast-wrapper";
-    document.body.appendChild(wrapper);
-  }
+    if (!wrapper) {
+      wrapper = document.createElement("div");
+      wrapper.className = "toast-wrapper";
+      document.body.appendChild(wrapper);
+    }
 
-  const t = document.createElement("div");
-  t.className = `toast-message ${type}`;
-  t.innerText = msg;
+    const t = document.createElement("div");
+    t.className = `toast-message ${type}`;
+    t.innerText = msg;
 
-  wrapper.appendChild(t);
+    wrapper.appendChild(t);
 
-  // fade + remove
-  setTimeout(() => (t.style.opacity = "0"), 1800);
-  setTimeout(() => t.remove(), 2400);
-};
+    setTimeout(() => (t.style.opacity = "0"), 1800);
+    setTimeout(() => t.remove(), 2400);
+  };
 
-
-  // Show toast if user was updated
   useEffect(() => {
     if (updateMessage) {
       showToast(updateMessage, "success");
-      navigate(location.pathname, { replace: true }); // clear state
+      navigate(location.pathname, { replace: true });
     }
   }, [updateMessage, navigate, location.pathname]);
+
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "—";
@@ -63,6 +99,9 @@ const showToast = (msg, type = "success") => {
     return `${d.getDate()}-${m[d.getMonth()]}-${d.getFullYear()}`;
   };
 
+  // ======================
+  // LOAD ROLES
+  // ======================
   const loadRoles = useCallback(async () => {
     try {
       const res = await axios.get("http://127.0.0.1:8000/api/auth/roles/");
@@ -72,6 +111,9 @@ const showToast = (msg, type = "success") => {
     }
   }, []);
 
+  // ======================
+  // LOAD USERS
+  // ======================
   const loadUsers = useCallback(async () => {
     setLoading(true);
 
@@ -126,6 +168,8 @@ const showToast = (msg, type = "success") => {
     if (roles.length) loadUsers();
   }, [roles, loadUsers]);
 
+
+  // CSV EXPORT
   const exportUsers = () => {
     const headers = [
       "Username","Email","Role","Status","Joined",
@@ -178,8 +222,6 @@ const showToast = (msg, type = "success") => {
       );
 
       setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
-
-      // 🔥 Bottom toast for delete
       showToast("User deleted successfully", "success");
 
     } catch (err) {
@@ -189,6 +231,9 @@ const showToast = (msg, type = "success") => {
     setShowConfirm(false);
   };
 
+  // ===================================================
+  //                    RETURN UI
+  // ===================================================
   return (
     <div className="manage-users-container">
       <div className="page-header">
@@ -196,8 +241,16 @@ const showToast = (msg, type = "success") => {
         <p>View, edit and manage users</p>
 
         <div className="header-actions">
-          <button className="export-btn" onClick={exportUsers}>Export</button>
-          <button className="add-btn" onClick={handleAdd}>+ Add User</button>
+
+          {/* 🔥 Export allowed for all */}
+          <button className="export-btn" onClick={exportUsers}>
+            Export
+          </button>
+
+          {/* 🔥 Show Add button only if permission granted */}
+          {canAdd && (
+            <button className="add-btn" onClick={handleAdd}>+ Add User</button>
+          )}
         </div>
       </div>
 
@@ -250,18 +303,40 @@ const showToast = (msg, type = "success") => {
                 <td><span className={`status-badge ${u.status.toLowerCase()}`}>{u.status}</span></td>
                 <td>{u.dateJoined}</td>
                 <td>
-                  <button className="action-btn edit" onClick={() => handleEdit(u)}>
-                    <Edit2 size={16} />
-                  </button>
 
-                  <button className="action-btn delete" onClick={() => { setUserToDelete(u); setShowConfirm(true); }}>
-                    <Trash2 size={16} />
-                  </button>
+                  {/* 🔥 Edit only if allowed */}
+                  {canEdit && (
+                    <button
+                      className="action-btn edit"
+                      onClick={() => handleEdit(u)}
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  )}
+
+                  {/* 🔥 Delete only if allowed */}
+                  {canDelete && (
+                    <button
+                      className="action-btn delete"
+                      onClick={() => {
+                        setUserToDelete(u);
+                        setShowConfirm(true);
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+
+                  {/* If no action permitted */}
+                  {!canEdit && !canDelete && (
+                    <span style={{ color: "#bbb" }}>No Access</span>
+                  )}
+
                 </td>
               </tr>
             ))
           ) : (
-            <tr><td colSpan="6" style={{ textAlign: "center" }}>No users found</td></tr>
+            <tr><td colSpan="6" style={{ textAlign:"center" }}>No users found</td></tr>
           )}
         </tbody>
       </table>
@@ -283,7 +358,7 @@ const showToast = (msg, type = "success") => {
             <button className="btn btn-gray" onClick={() => setShowConfirm(false)}>Cancel</button>
           </div>
         </div>
-      )}
+      )},
     </div>
   );
 }
