@@ -54,11 +54,17 @@ function App() {
     );
   }
 
-  const getDefaultRoute = () => {
-    if (user?.is_admin) return "/admin/dashboard";
-    if (user) return "/dashboard";
-    return "/login";
-  };
+const getDefaultRoute = () => {
+  if (!user) return "/login";
+
+  const roleId = Number(user.role_id);
+
+  if (!isNaN(roleId) && roleId !== 2) {
+    return "/admin/dashboard";  // admin
+  }
+  return "/dashboard"; // user
+};
+
 
   return (
     <Routes>

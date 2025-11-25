@@ -4,19 +4,20 @@ import { useNavigate, Link } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import "./LoginPage.css";
 
-
 const FALLBACK_CODES = {
   LOGIN_FAILED: "EL001",
   LOGIN_SUCCESS: "IL001",
   SERVER_ERROR: "EA010",
 };
 
+const PERMISSIONS_KEY = "permissions";
+
 function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState(""); // "error" | "success"
+  const [messageType, setMessageType] = useState(""); // error | success
   const navigate = useNavigate();
 
   const [msgTables, setMsgTables] = useState({
@@ -25,30 +26,26 @@ function LoginPage() {
     user_validation: {},
   });
 
-  // Convert arrays or objects to { CODE: "text" }
+  // Normalizing message tables
   const normalize = (maybeArr, type) => {
     if (!maybeArr) return {};
     const map = {};
     if (Array.isArray(maybeArr)) {
       for (const item of maybeArr) {
         if (!item) continue;
-        if (type === "error" && item.error_code) {
-          map[String(item.error_code).toUpperCase()] = item.error_message || "";
-        } else if (type === "info" && item.information_code) {
-          map[String(item.information_code).toUpperCase()] = item.information_text || "";
-        } else if (type === "validation" && item.validation_code) {
-          map[String(item.validation_code).toUpperCase()] = item.validation_message || "";
-        }
-      }
-    } else if (typeof maybeArr === "object") {
-      for (const [k, v] of Object.entries(maybeArr)) {
-        map[String(k).toUpperCase()] = typeof v === "string" ? v : String(v || "");
+        if (type === "error" && item.error_code)
+          map[item.error_code.toUpperCase()] = item.error_message || "";
+        if (type === "info" && item.information_code)
+          map[item.information_code.toUpperCase()] = item.information_text || "";
+        if (type === "validation" && item.validation_code)
+          map[item.validation_code.toUpperCase()] =
+            item.validation_message || "";
       }
     }
     return map;
-    };
+  };
 
-  // Load cached tables (App already populated localStorage)
+  // Load cached message tables
   useEffect(() => {
     try {
       const e = JSON.parse(localStorage.getItem("user_error") || "[]");
@@ -69,6 +66,9 @@ function LoginPage() {
   const getInfoText = (code) =>
     msgTables.user_information[(code || "").toUpperCase()] || "";
 
+  // ---------------------------
+  // LOGIN HANDLER
+  // ---------------------------
   const handleLogin = async (e) => {
     e.preventDefault();
     setMessage("");
@@ -83,79 +83,93 @@ function LoginPage() {
 
       const data = await res.json().catch(() => ({}));
 
-      // Invalid credentials → no tokens should be kept
+      // Invalid credentials
       if (!res.ok || !data.access) {
         localStorage.removeItem("access");
         localStorage.removeItem("refresh");
+        localStorage.removeItem(PERMISSIONS_KEY);
 
-        const code = (data.code && String(data.code)) || FALLBACK_CODES.LOGIN_FAILED;
-        const text = data.message || getErrorText(code) || "Invalid credentials.";
+        const code =
+          (data.code && String(data.code)) || FALLBACK_CODES.LOGIN_FAILED;
+        const text =
+          data.message || getErrorText(code) || "Invalid credentials.";
+
         setMessage(text);
         setMessageType("error");
         return;
       }
 
-      // Success
-      const infoCode = (data.code && String(data.code)) || FALLBACK_CODES.LOGIN_SUCCESS;
-      setMessage(data.message || getInfoText(infoCode) || "Login successful.");
+      // Success message
+      const infoCode =
+        (data.code && String(data.code)) || FALLBACK_CODES.LOGIN_SUCCESS;
+      setMessage(
+        data.message || getInfoText(infoCode) || "Login successful."
+      );
       setMessageType("success");
 
-      // Store tokens + user
+      // Store tokens
       localStorage.setItem("access", data.access);
       if (data.refresh) localStorage.setItem("refresh", data.refresh);
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          username: data.username,
-          email: data.email,
-          is_admin: data.is_admin,
-        })
-      );
+
+      // Store permissions
+ localStorage.setItem(
+  "user",
+  JSON.stringify({
+    username: data.username,
+    email: data.email,
+    is_admin: data.is_admin,
+    role_id: data.role_id,
+    role_name: data.role_name,
+    permissions: data.permissions || []
+  })
+);
+
 
       const token = data.access;
 
-      // Navigate after a short delay to let the success message render
+      // -------------------------------------
+      // ROLE-BASED REDIRECT
+      // -------------------------------------
       setTimeout(async () => {
-  // Always parse role_id safely
-  const roleId = parseInt(data.role_id, 10);
+        const roleId = Number(data.role_id); // always parse safely
 
-  // Admin redirect rule:
-  // If role_id exists AND is not equal to 2 → admin dashboard
-  if (!isNaN(roleId) && roleId !== 2) {
-    navigate("/admin/dashboard", { replace: true });
-    return;
-  }
+        // ADMIN = any role except 2
+        if (!isNaN(roleId) && roleId !== 2) {
+          navigate("/admin/dashboard", { replace: true });
+          return;
+        }
 
-  // Otherwise → user dashboard flow
-  try {
-    const addrRes = await fetch("http://127.0.0.1:8000/api/addresses/check/", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
+        // USER = role_id === 2 → normal dashboard/address flow
+        try {
+          const addrRes = await fetch(
+            "http://127.0.0.1:8000/api/addresses/check/",
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
 
-    const addrData = await addrRes.json().catch(() => ({}));
+          const addrData = await addrRes.json().catch(() => ({}));
 
-    if (addrRes.ok && addrData.has_address) {
-      navigate("/dashboard", { replace: true });
-    } else {
-      navigate("/addresses", { replace: true });
-    }
-  } catch {
-    navigate("/addresses", { replace: true });
-  }
-}, 700);
-
-
+          if (addrRes.ok && addrData.has_address) {
+            navigate("/dashboard", { replace: true });
+          } else {
+            navigate("/addresses", { replace: true });
+          }
+        } catch {
+          navigate("/addresses", { replace: true });
+        }
+      }, 700);
     } catch {
-  const fallback =
-    getErrorText(FALLBACK_CODES.SERVER_ERROR) ||
-    "Server error. Please try again.";
-  setMessage(fallback);
-  setMessageType("error");
-}
+      const fallback =
+        getErrorText(FALLBACK_CODES.SERVER_ERROR) ||
+        "Server error. Please try again.";
+      setMessage(fallback);
+      setMessageType("error");
+    }
   };
 
   return (
@@ -191,7 +205,11 @@ function LoginPage() {
           </div>
 
           {message && (
-            <p className={`login-message ${messageType === "error" ? "error-text" : "success-text"}`}>
+            <p
+              className={`login-message ${
+                messageType === "error" ? "error-text" : "success-text"
+              }`}
+            >
               {message}
             </p>
           )}
@@ -202,8 +220,12 @@ function LoginPage() {
         </form>
 
         <div className="login-links">
-          <p><Link to="/forgot-password">Forgot password?</Link></p>
-          <p>Don’t have an account? <Link to="/register">Register</Link></p>
+          <p>
+            <Link to="/forgot-password">Forgot password?</Link>
+          </p>
+          <p>
+            Don’t have an account? <Link to="/register">Register</Link>
+          </p>
         </div>
       </div>
     </div>

@@ -4,16 +4,16 @@ function AdminProtectedRoute({ children }) {
   const token = localStorage.getItem("access");
   const user = JSON.parse(localStorage.getItem("user"));
 
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!token) return <Navigate to="/login" replace />;
 
-  // ✅ Correct admin check
-  if (!user?.is_admin) {
+  const roleId = Number(user?.role_id);
+
+  if (isNaN(roleId) || roleId === 2) {
     return <Navigate to="/dashboard" replace />;
   }
 
   return children;
 }
+
 
 export default AdminProtectedRoute;

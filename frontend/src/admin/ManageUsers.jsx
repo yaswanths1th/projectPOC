@@ -5,81 +5,53 @@ import { Edit2, Trash2 } from "lucide-react";
 import "./ManageUsers.css";
 
 function ManageUsers() {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // ==========================
-  // 🔥 RBAC PERMISSIONS STATES
-  // ==========================
+  // -------------------------
+  // All states (declared up-front to keep Hook order stable)
+  // -------------------------
+  const token = localStorage.getItem("access");
+
+  // Auth/admin verification
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Permissions
   const [canAdd, setCanAdd] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
+  const [canExport, setCanExport] = useState(false);
 
-  const token = localStorage.getItem("access");
-
-  const checkPermission = async (codename) => {
-    try {
-      const res = await axios.get(
-        "http://127.0.0.1:8000/api/permissions/has_permission/",
-        {
-          params: { codename },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      return res.data?.has === true;
-    } catch {
-      return false;
-    }
-  };
-
-  // Call only once
-  useEffect(() => {
-    (async () => {
-      setCanAdd(await checkPermission("add_user"));
-      setCanEdit(await checkPermission("edit_user"));
-      setCanDelete(await checkPermission("delete_user"));
-    })();
-  }, []);
-
-  // ==========================
-  // EXISTING STATES
-  // ==========================
+  // Data + UI states
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-
-  const location = useLocation();
   const initialStatusFilter = location.state?.statusFilter || "All Status";
   const updateMessage = location.state?.updateMessage;
-
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [roleFilter, setRoleFilter] = useState("All Roles");
-
   const [showConfirm, setShowConfirm] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
-
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+
   const usersPerPage = 10;
 
-  const navigate = useNavigate();
-
-  // ======================
-  // 🔥 Toast (Same as before)
-  // ======================
+  // -------------------------
+  // Helper: Toast
+  // -------------------------
   const showToast = (msg, type = "success") => {
     let wrapper = document.querySelector(".toast-wrapper");
-
     if (!wrapper) {
       wrapper = document.createElement("div");
       wrapper.className = "toast-wrapper";
       document.body.appendChild(wrapper);
     }
-
     const t = document.createElement("div");
     t.className = `toast-message ${type}`;
     t.innerText = msg;
-
     wrapper.appendChild(t);
-
     setTimeout(() => (t.style.opacity = "0"), 1800);
     setTimeout(() => t.remove(), 2400);
   };
@@ -87,36 +59,129 @@ function ManageUsers() {
   useEffect(() => {
     if (updateMessage) {
       showToast(updateMessage, "success");
+      // remove state from location so message doesn't repeat
       navigate(location.pathname, { replace: true });
     }
   }, [updateMessage, navigate, location.pathname]);
 
+  // -------------------------
+  // Permission checker (uses token)
+  // -------------------------
+  const checkPermission = useCallback(
+    async (codename) => {
+      if (!token) return false;
+      try {
+        const res = await axios.get(
+          "http://127.0.0.1:8000/api/permissions/has_permission/",
+          {
+            params: { codename },
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        return res.data?.has === true;
+      } catch {
+        return false;
+      }
+    },
+    [token]
+  );
 
+  // -------------------------
+  // Profile verification -> decide admin or redirect.
+  // This effect runs once. It sets authChecked/isAdmin.
+  // -------------------------
+  useEffect(() => {
+    const verifyUser = async () => {
+      if (!token) {
+        // no token -> go to login
+        localStorage.clear();
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      try {
+        const res = await axios.get("http://127.0.0.1:8000/api/auth/profile/", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = res.data || {};
+        const backendIsAdmin = Boolean(
+          data.is_staff || data.is_superuser || data.is_admin
+        );
+
+        setIsAdmin(backendIsAdmin);
+        setAuthChecked(true);
+
+        // don't navigate here — allow other effects to use isAdmin to fetch
+        if (!backendIsAdmin) {
+          // non-admin should not stay: redirect to user dashboard
+          navigate("/dashboard", { replace: true });
+        }
+      } catch (err) {
+        // If tokens invalid -> clean and go to login
+        localStorage.clear();
+        navigate("/login", { replace: true });
+      }
+    };
+
+    verifyUser();
+  }, [token, navigate]);
+
+  // -------------------------
+  // Load permissions only after authChecked && isAdmin === true
+  // -------------------------
+  useEffect(() => {
+    if (!authChecked || !isAdmin) return;
+
+    let mounted = true;
+    (async () => {
+      try {
+        const [pAdd, pEdit, pDelete,pExport] = await Promise.all([
+          checkPermission("add_user"),
+          checkPermission("edit_user"),
+          checkPermission("delete_user"),
+          checkPermission("export_user"),
+        ]);
+        if (!mounted) return;
+        setCanAdd(pAdd);
+        setCanEdit(pEdit);
+        setCanDelete(pDelete);
+        setCanExport(pExport);
+      } catch {
+        // ignore, defaults are false
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [authChecked, isAdmin, checkPermission]);
+
+  // -------------------------
+  // Date formatter
+  // -------------------------
   const formatDate = (dateStr) => {
     if (!dateStr) return "—";
     const d = new Date(dateStr);
-    const m = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const m = [
+      "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec",
+    ];
     return `${d.getDate()}-${m[d.getMonth()]}-${d.getFullYear()}`;
   };
 
-  // ======================
-  // LOAD ROLES
-  // ======================
+  // -------------------------
+  // Load roles & users (admin endpoints)
+  // -------------------------
   const loadRoles = useCallback(async () => {
     try {
       const res = await axios.get("http://127.0.0.1:8000/api/auth/roles/");
       setRoles(Array.isArray(res.data) ? res.data : []);
-    } catch {
+    } catch (err) {
       showToast("Failed loading roles", "error");
     }
   }, []);
 
-  // ======================
-  // LOAD USERS
-  // ======================
   const loadUsers = useCallback(async () => {
     setLoading(true);
-
     try {
       const res = await axios.get(
         "http://127.0.0.1:8000/api/auth/admin/users/",
@@ -129,7 +194,6 @@ function ManageUsers() {
         raw.map(async (u) => {
           const roleObj = roles.find((r) => Number(r.id) === Number(u.role));
           let address = {};
-
           try {
             const addrRes = await axios.get(
               `http://127.0.0.1:8000/api/addresses/?user=${u.id}`,
@@ -139,7 +203,6 @@ function ManageUsers() {
               address = addrRes.data[0];
             }
           } catch {}
-
           return {
             id: u.id,
             username: u.username,
@@ -153,23 +216,36 @@ function ManageUsers() {
       );
 
       setUsers(formatted);
-    } catch {
-      showToast("Failed loading users", "error");
+    } catch (err) {
+      // If backend says Forbidden -> likely not permitted -> notify + redirect
+      if (err.response?.status === 403) {
+        showToast("You are not authorized to view users.", "error");
+        navigate("/dashboard", { replace: true });
+      } else {
+        showToast("Failed loading users", "error");
+      }
+    } finally {
+      setLoading(false);
     }
+  }, [roles, token, navigate]);
 
-    setLoading(false);
-  }, [roles, token]);
-
+  // Start role load once admin verified
   useEffect(() => {
+    if (!authChecked || !isAdmin) return;
     loadRoles();
-  }, [loadRoles]);
+  }, [authChecked, isAdmin, loadRoles]);
 
+  // Once roles exist, load users
   useEffect(() => {
-    if (roles.length) loadUsers();
-  }, [roles, loadUsers]);
+    if (!authChecked || !isAdmin) return;
+    if (roles.length) {
+      loadUsers();
+    }
+  }, [authChecked, isAdmin, roles, loadUsers]);
 
-
-  // CSV EXPORT
+  // -------------------------
+  // CSV export
+  // -------------------------
   const exportUsers = () => {
     const headers = [
       "Username","Email","Role","Status","Joined",
@@ -178,7 +254,6 @@ function ManageUsers() {
     ];
 
     const csvRows = [headers.join(",")];
-
     users.forEach((u) => {
       const a = u.address || {};
       csvRows.push([
@@ -196,10 +271,14 @@ function ManageUsers() {
     link.click();
   };
 
+  // -------------------------
+  // Filtering & pagination
+  // -------------------------
   const filtered = users.filter((u) => {
+    const q = searchQuery.toLowerCase();
     const matchSearch =
-      u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase());
+      u.username.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q);
 
     const matchStatus = statusFilter === "All Status" || u.status === statusFilter;
     const matchRole = roleFilter === "All Roles" || u.role === roleFilter;
@@ -211,29 +290,51 @@ function ManageUsers() {
   const current = filtered.slice(indexOfLast - usersPerPage, indexOfLast);
   const totalPages = Math.max(1, Math.ceil(filtered.length / usersPerPage));
 
+  // -------------------------
+  // Actions
+  // -------------------------
   const handleEdit = (u) => navigate(`/admin/users/edit/${u.id}`);
   const handleAdd = () => navigate("/admin/users/add");
 
   const handleDelete = async () => {
+    if (!userToDelete) return;
     try {
       await axios.delete(
         `http://127.0.0.1:8000/api/auth/admin/users/${userToDelete.id}/`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+      setUsers((prev) => prev.filter((x) => x.id !== userToDelete.id));
       showToast("User deleted successfully", "success");
-
     } catch (err) {
       const msg = err.response?.data?.message || "Delete failed";
       showToast(msg, "error");
+    } finally {
+      setShowConfirm(false);
+      setUserToDelete(null);
     }
-    setShowConfirm(false);
   };
 
-  // ===================================================
-  //                    RETURN UI
-  // ===================================================
+  // -------------------------
+  // Render UI
+  // -------------------------
+  // If auth not yet checked, show a small waiting UI (prevents flash)
+  if (!authChecked) {
+    return (
+      <div style={{ padding: 40 }}>
+        Checking permissions...
+      </div>
+    );
+  }
+
+  // If checked and not admin we already navigate away in effect; show fallback
+  if (!isAdmin) {
+    return (
+      <div style={{ padding: 40 }}>
+        Redirecting...
+      </div>
+    );
+  }
+
   return (
     <div className="manage-users-container">
       <div className="page-header">
@@ -241,15 +342,14 @@ function ManageUsers() {
         <p>View, edit and manage users</p>
 
         <div className="header-actions">
-
-          {/* 🔥 Export allowed for all */}
           <button className="export-btn" onClick={exportUsers}>
             Export
           </button>
 
-          {/* 🔥 Show Add button only if permission granted */}
           {canAdd && (
-            <button className="add-btn" onClick={handleAdd}>+ Add User</button>
+            <button className="add-btn" onClick={handleAdd}>
+              + Add User
+            </button>
           )}
         </div>
       </div>
@@ -259,13 +359,19 @@ function ManageUsers() {
           className="filter-input search-box"
           placeholder="Search by username or email"
           value={searchQuery}
-          onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1);
+          }}
         />
 
         <select
           className="filter-select"
           value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setCurrentPage(1);
+          }}
         >
           <option>All Status</option>
           <option>Active</option>
@@ -275,7 +381,10 @@ function ManageUsers() {
         <select
           className="filter-select"
           value={roleFilter}
-          onChange={(e) => { setRoleFilter(e.target.value); setCurrentPage(1); }}
+          onChange={(e) => {
+            setRoleFilter(e.target.value);
+            setCurrentPage(1);
+          }}
         >
           <option>All Roles</option>
           {roles.map((r) => (
@@ -299,39 +408,25 @@ function ManageUsers() {
               <tr key={u.id}>
                 <td>{u.username}</td>
                 <td>{u.email}</td>
-                <td><span className={`role-badge ${u.role.toLowerCase()}`}>{u.role}</span></td>
-                <td><span className={`status-badge ${u.status.toLowerCase()}`}>{u.status}</span></td>
+                <td><span className={`role-badge ${String(u.role || "").toLowerCase()}`}>{u.role}</span></td>
+                <td><span className={`status-badge ${String(u.status || "").toLowerCase()}`}>{u.status}</span></td>
                 <td>{u.dateJoined}</td>
                 <td>
-
-                  {/* 🔥 Edit only if allowed */}
                   {canEdit && (
-                    <button
-                      className="action-btn edit"
-                      onClick={() => handleEdit(u)}
-                    >
+                    <button className="action-btn edit" onClick={() => handleEdit(u)}>
                       <Edit2 size={16} />
                     </button>
                   )}
 
-                  {/* 🔥 Delete only if allowed */}
                   {canDelete && (
-                    <button
-                      className="action-btn delete"
-                      onClick={() => {
-                        setUserToDelete(u);
-                        setShowConfirm(true);
-                      }}
-                    >
+                    <button className="action-btn delete" onClick={() => { setUserToDelete(u); setShowConfirm(true); }}>
                       <Trash2 size={16} />
                     </button>
                   )}
 
-                  {/* If no action permitted */}
                   {!canEdit && !canDelete && (
                     <span style={{ color: "#bbb" }}>No Access</span>
                   )}
-
                 </td>
               </tr>
             ))
@@ -355,10 +450,10 @@ function ManageUsers() {
             <h3>Confirm Delete</h3>
             <p>Delete user <b>{userToDelete?.username}</b>?</p>
             <button className="btn btn-danger" onClick={handleDelete}>Delete</button>
-            <button className="btn btn-gray" onClick={() => setShowConfirm(false)}>Cancel</button>
+            <button className="btn btn-gray" onClick={() => { setShowConfirm(false); setUserToDelete(null); }}>Cancel</button>
           </div>
         </div>
-      )},
+      )}
     </div>
   );
 }

@@ -6,7 +6,16 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
+from .models_permissions import (
+    Permission, DepartmentPermission, RolePermission, UserPermissionOverride
+)
+from .permissions import IsRoleAdmin
+
+
+
+
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
 import logging
 
 from .models import (
@@ -37,18 +46,25 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         try:
             data = super().validate(attrs)
         except Exception:
-            # No token on invalid login; frontend shows EL001 from tables
             return {"code": "EL001"}
 
         user = self.user
+
+        # Compute final effective permissions
+        permissions = get_effective_permissions(user)
+
         data.update({
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "is_admin": user.is_staff or user.is_superuser,
+            "is_admin": True if user.role_id != 2 else False,
             "role_id": user.role_id,
             "role_name": user.role.role_name if user.role else None,
+
+            # 🔥 New addition:
+            "permissions": permissions,
         })
+
         return data
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -59,7 +75,18 @@ class ProfileAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user).data, status=200)
+        user = request.user
+        data = UserSerializer(user).data
+
+        # Add admin flags
+        data.update({
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
+            "is_admin": user.is_staff or user.is_superuser or (user.role_id != 2)
+        })
+
+        return Response(data, status=200)
+
 
     def put(self, request):
         serializer = UserSerializer(request.user, data=request.data, partial=True)
@@ -72,7 +99,7 @@ class ProfileAPIView(APIView):
 class AdminUserListCreateAPIView(generics.ListCreateAPIView):
     queryset = User.objects.all().order_by("-id")
     serializer_class = UserSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsRoleAdmin]
 
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
@@ -101,11 +128,13 @@ class AdminUserListCreateAPIView(generics.ListCreateAPIView):
         user.save()
 
         return Response({"code": "IR001", "id": user.id}, status=201)
+    
+    
 
 class AdminUserUpdateDeleteAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsRoleAdmin]
 
     def destroy(self, request, *args, **kwargs):
         user = self.get_object()
@@ -125,7 +154,7 @@ def user_toggle_active(request, pk):
 
 # Admin stats
 class AdminUserStatsAPIView(generics.GenericAPIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsRoleAdmin]
 
     def get(self, request):
         return Response({
@@ -158,7 +187,7 @@ class DepartmentListCreateAPIView(generics.ListCreateAPIView):
 class DepartmentRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsRoleAdmin]
 
 @api_view(["POST"])
 @permission_classes([IsAdminUser])
@@ -197,7 +226,7 @@ class RoleListCreateAPIView(generics.ListCreateAPIView):
 class RoleRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsRoleAdmin]
 
 @api_view(["POST"])
 @permission_classes([IsAdminUser])
@@ -293,3 +322,36 @@ def check_email(request):
         return Response({"detail": "email query param required"}, status=status.HTTP_400_BAD_REQUEST)
     exists = User.objects.filter(email__iexact=email).exists()
     return Response({"exists": exists}, status=status.HTTP_200_OK)
+
+
+def get_effective_permissions(user):
+    """
+    Compute final permission list with following priority:
+    1️⃣ UserOverride (allow/deny)
+    2️⃣ Role permissions (allow/deny)
+    3️⃣ Department permissions (allow)
+    """
+
+    final = {}
+    
+    # 1️⃣ User Overrides
+    overrides = UserPermissionOverride.objects.filter(user=user)
+    for o in overrides:
+        final[o.permission.codename] = o.is_allowed
+
+    # 2️⃣ Role Permissions
+    if user.role_id:
+        role_perms = RolePermission.objects.filter(role_id=user.role_id)
+        for rp in role_perms:
+            if rp.permission.codename not in final:
+                final[rp.permission.codename] = rp.is_allowed
+
+    # 3️⃣ Department Permissions
+    if user.department_id:
+        dept_perms = DepartmentPermission.objects.filter(department_id=user.department_id)
+        for dp in dept_perms:
+            if dp.permission.codename not in final:
+                final[dp.permission.codename] = True   # department always “allow”
+
+    # return only codename of allowed permissions
+    return sorted([codename for codename, allowed in final.items() if allowed])
