@@ -1,16 +1,10 @@
 // frontend/src/pages/LoginPage.jsx
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useContext } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import "./LoginPage.css";
-
-const FALLBACK_CODES = {
-  LOGIN_FAILED: "EL001",
-  LOGIN_SUCCESS: "IL001",
-  SERVER_ERROR: "EA010",
-};
-
-const PERMISSIONS_KEY = "permissions";
+import { UserContext } from "../context/UserContext";
 
 function LoginPage() {
   const [username, setUsername] = useState("");
@@ -26,7 +20,9 @@ function LoginPage() {
     user_validation: {},
   });
 
-  // Normalizing message tables
+  // -------------------------------
+  // Normalize DB message tables
+  // -------------------------------
   const normalize = (maybeArr, type) => {
     if (!maybeArr) return {};
     const map = {};
@@ -38,19 +34,18 @@ function LoginPage() {
         if (type === "info" && item.information_code)
           map[item.information_code.toUpperCase()] = item.information_text || "";
         if (type === "validation" && item.validation_code)
-          map[item.validation_code.toUpperCase()] =
-            item.validation_message || "";
+          map[item.validation_code.toUpperCase()] = item.validation_message || "";
       }
     }
     return map;
   };
 
-  // Load cached message tables
   useEffect(() => {
     try {
       const e = JSON.parse(localStorage.getItem("user_error") || "[]");
       const i = JSON.parse(localStorage.getItem("user_information") || "[]");
       const v = JSON.parse(localStorage.getItem("user_validation") || "[]");
+
       setMsgTables({
         user_error: normalize(e, "error"),
         user_information: normalize(i, "info"),
@@ -63,12 +58,13 @@ function LoginPage() {
 
   const getErrorText = (code) =>
     msgTables.user_error[(code || "").toUpperCase()] || "";
+
   const getInfoText = (code) =>
     msgTables.user_information[(code || "").toUpperCase()] || "";
 
-  // ---------------------------
-  // LOGIN HANDLER
-  // ---------------------------
+  // -------------------------------
+  // LOGIN HANDLER (COOKIE-BASED)
+  // -------------------------------
   const handleLogin = async (e) => {
     e.preventDefault();
     setMessage("");
@@ -77,96 +73,112 @@ function LoginPage() {
     try {
       const res = await fetch("http://127.0.0.1:8000/api/auth/login/", {
         method: "POST",
+        credentials: "include", // IMPORTANT for cookies
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
 
       const data = await res.json().catch(() => ({}));
+      console.log("LOGIN RESPONSE:", data);
 
-      // Invalid credentials
-      if (!res.ok || !data.access) {
-        localStorage.removeItem("access");
-        localStorage.removeItem("refresh");
-        localStorage.removeItem(PERMISSIONS_KEY);
 
-        const code =
-          (data.code && String(data.code)) || FALLBACK_CODES.LOGIN_FAILED;
+      // -------------------------
+      // INVALID CREDENTIALS
+      // -------------------------
+      if (!res.ok || !data.username) {
+        const code = data.code || "EL001";
         const text =
-          data.message || getErrorText(code) || "Invalid credentials.";
+          data.message ||
+          getErrorText(code) ||
+          "Invalid username or password.";
 
         setMessage(text);
         setMessageType("error");
         return;
       }
 
-      // Success message
-      const infoCode =
-        (data.code && String(data.code)) || FALLBACK_CODES.LOGIN_SUCCESS;
-      setMessage(
-        data.message || getInfoText(infoCode) || "Login successful."
-      );
+      // -------------------------
+      // SUCCESS MESSAGE
+      // -------------------------
+      const infoCode = data.code || "IL001";
+      const successText =
+        data.message ||
+        getInfoText(infoCode) ||
+        "Login successful.";
+
+      setMessage(successText);
       setMessageType("success");
 
-      // Store tokens
-      localStorage.setItem("access", data.access);
-      if (data.refresh) localStorage.setItem("refresh", data.refresh);
+      // -------------------------
+      // STORE USER (no tokens!)
+      // -------------------------
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          username: data.username,
+          email: data.email,
+          role_id: data.role_id,
+          role_name: data.role_name,
+          is_admin: data.is_admin,
+          permissions: data.permissions,
+        })
+      );
 
-      // Store permissions
- localStorage.setItem(
-  "user",
-  JSON.stringify({
-    username: data.username,
-    email: data.email,
-    is_admin: data.is_admin,
-    role_id: data.role_id,
-    role_name: data.role_name,
-    permissions: data.permissions || []
-  })
-);
+      // -------------------------
+      // FORCE PASSWORD CHANGE
+      // -------------------------
+      if (data.force_password_change === true) {
+        setTimeout(() => {
+          navigate("/change-password", { replace: true });
+        }, 700);
+        return;
+      }
 
-
-      const token = data.access;
-
-      // -------------------------------------
+      // -------------------------
       // ROLE-BASED REDIRECT
-      // -------------------------------------
+      // -------------------------
       setTimeout(async () => {
-        const roleId = Number(data.role_id); // always parse safely
+  console.log("Redirect check:", data);
 
-        // ADMIN = any role except 2
-        if (!isNaN(roleId) && roleId !== 2) {
-          navigate("/admin/dashboard", { replace: true });
-          return;
-        }
+  const roleId = Number(data.role_id);
 
-        // USER = role_id === 2 → normal dashboard/address flow
-        try {
-          const addrRes = await fetch(
-            "http://127.0.0.1:8000/api/addresses/check/",
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
+  // If backend didn't send role_id → treat as user
+  if (isNaN(roleId)) {
+    navigate("/dashboard", { replace: true });
+    return;
+  }
 
-          const addrData = await addrRes.json().catch(() => ({}));
+  // ADMIN = any role_id except 2
+  if (roleId !== 2) {
+    navigate("/admin/dashboard", { replace: true });
+    return;
+  }
 
-          if (addrRes.ok && addrData.has_address) {
-            navigate("/dashboard", { replace: true });
-          } else {
-            navigate("/addresses", { replace: true });
-          }
-        } catch {
-          navigate("/addresses", { replace: true });
-        }
-      }, 700);
+  // USER = role_id === 2 → check address
+  try {
+    const addrRes = await fetch("http://127.0.0.1:8000/api/addresses/check/", {
+      method: "GET",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const addrData = await addrRes.json();
+    console.log("Address check:", addrData);
+
+    if (addrRes.ok && addrData.has_address) {
+      navigate("/dashboard", { replace: true });
+    } else {
+      navigate("/addresses", { replace: true });
+    }
+  } catch {
+    navigate("/addresses", { replace: true });
+  }
+}, 700);
+
     } catch {
-      const fallback =
-        getErrorText(FALLBACK_CODES.SERVER_ERROR) ||
-        "Server error. Please try again.";
+      let fallback = getErrorText("EA010");
+      if (!fallback) fallback = "Unable to reach server. Please try again.";
+
       setMessage(fallback);
       setMessageType("error");
     }

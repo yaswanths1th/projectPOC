@@ -1,19 +1,17 @@
 import { Navigate } from "react-router-dom";
+import { useContext } from "react";
+import { UserContext } from "../context/UserContext";
 
 function AdminProtectedRoute({ children }) {
-  const token = localStorage.getItem("access");
-  const user = JSON.parse(localStorage.getItem("user"));
+  const { user, loading } = useContext(UserContext);
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (loading) return null; // no flicker
 
-  const roleId = Number(user?.role_id);
+  if (!user) return <Navigate to="/login" replace />;
 
-  if (isNaN(roleId) || roleId === 2) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (!user.is_admin) return <Navigate to="/dashboard" replace />;
 
   return children;
 }
-
 
 export default AdminProtectedRoute;

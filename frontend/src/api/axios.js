@@ -1,17 +1,20 @@
-// ✅ src/api/axios.js
+// src/api/axios.js
 import axios from "axios";
 
 const api = axios.create({
   baseURL: "http://127.0.0.1:8000",
+  withCredentials: true,    // 🔑 Enable cookies
 });
-
-// ✅ Automatically attach token to every request
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Handle silently — do not log browser red console
+      return Promise.reject({ silent: true });
+    }
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
+//  Remove token injection — no Authorization header needed now
 export default api;

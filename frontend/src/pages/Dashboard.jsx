@@ -21,21 +21,17 @@ export default function Dashboard() {
 
   const loadDashboard = async () => {
     try {
-      // ✅ Fetch Profile
+      // Fetch Profile
       const resProfile = await fetch("http://127.0.0.1:8000/api/auth/profile/", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const dataProfile = await resProfile.json();
       setProfile(dataProfile);
 
-      // ✅ Check Address
+      // Check Address
       const resAddr = await fetch("http://127.0.0.1:8000/api/addresses/check/", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       const dataAddr = await resAddr.json();
@@ -52,10 +48,10 @@ export default function Dashboard() {
   return (
     <div className="user-dashboard-container">
 
-      {/* ✅ FULL-WIDTH OVERVIEW CARD */}
+      {/* Overview Card */}
       <div className="overview-card">
 
-        {/* HEADER */}
+        {/* Header */}
         <section className="welcome-section">
           <h1 className="welcome-text">
             Welcome, {profile?.first_name || storedUser.username} 👋
@@ -63,13 +59,13 @@ export default function Dashboard() {
           <p className="subtitle">Here is your account overview</p>
         </section>
 
-        {/* ✅ STATUS CARDS */}
+        {/* Status Cards */}
         <section className="stats-section">
           <h3 className="section-title">Your Status</h3>
 
           <div className="stats-cards">
 
-            {/* 🔵 Profile Card → Redirect to Profile Page */}
+            {/* Profile Card */}
             <div
               className="stat-card"
               onClick={() => navigate("/profile")}
@@ -81,7 +77,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* 🔵 Address Card → Redirect to Address Page */}
+            {/* Address Card - UPDATED HERE */}
             <div
               className="stat-card"
               onClick={() => navigate("/addresses")}
@@ -89,11 +85,11 @@ export default function Dashboard() {
             >
               <div className="stat-info">
                 <h2>{addressExists ? "✓" : "—"}</h2>
-                <p>Address Added</p>
+                <p>{addressExists ? "Address Added" : "Add Address"}</p>
               </div>
             </div>
 
-            {/* 🔵 Status Card → Redirect to Profile Page */}
+            {/* Account Status Card */}
             <div
               className="stat-card"
               onClick={() => navigate("/profile")}

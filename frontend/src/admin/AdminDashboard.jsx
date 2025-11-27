@@ -1,5 +1,7 @@
+// frontend/src/admin/AdminDashboard.jsx
+
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import "../layouts/AdminLayout.css";
 import "./AdminDashboard.css";
 import { useNavigate } from "react-router-dom";
@@ -10,49 +12,17 @@ export default function AdminDashboard() {
     activeUsers: 0,
     holdUsers: 0,
   });
+
+  const [roleName, setRoleName] = useState("Admin");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
 
-  const API = axios.create({
-    baseURL: "http://127.0.0.1:8000/api/",
-  });
-
-  API.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-      const originalRequest = error.config;
-
-      if (
-        error.response?.status === 401 &&
-        !originalRequest._retry &&
-        localStorage.getItem("refresh")
-      ) {
-        originalRequest._retry = true;
-
-        try {
-          const refreshToken = localStorage.getItem("refresh");
-          const res = await axios.post("http://127.0.0.1:8000/api/auth/token/refresh/", {
-            refresh: refreshToken,
-          });
-
-          localStorage.setItem("access", res.data.access);
-          API.defaults.headers.common["Authorization"] = `Bearer ${res.data.access}`;
-          originalRequest.headers["Authorization"] = `Bearer ${res.data.access}`;
-          return API(originalRequest);
-        } catch {
-          localStorage.removeItem("access");
-          localStorage.removeItem("refresh");
-          window.location.href = "/login";
-        }
-      }
-
-      return Promise.reject(error);
-    }
-  );
-
   useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem("user") || "{}");
+    setRoleName(userData.role_name || "Admin");
+
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 10000);
     return () => clearInterval(interval);
@@ -63,12 +33,7 @@ export default function AdminDashboard() {
     setError("");
 
     try {
-      const token = localStorage.getItem("access");
-
-      const res = await API.get("auth/admin/stats/", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const res = await api.get("/api/auth/admin/stats/"); // 🍪 Cookie-based auth
       const data = res.data;
 
       setStats({
@@ -76,7 +41,7 @@ export default function AdminDashboard() {
         activeUsers: data.active_users,
         holdUsers: data.hold_users,
       });
-    } catch {
+    } catch (err) {
       setError("Failed to load user stats");
     } finally {
       setLoading(false);
@@ -90,7 +55,7 @@ export default function AdminDashboard() {
   return (
     <div className="admin-dashboard-container">
       <section className="welcome-section">
-        <h1 className="welcome-text">Welcome To Admin Dashboard..!!</h1>
+        <h1 className="welcome-text">Welcome to {roleName} Dashboard..!!</h1>
         <p className="subtitle">Manage your platform and settings</p>
       </section>
 

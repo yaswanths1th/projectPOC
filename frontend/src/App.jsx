@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+// src/App.jsx
+import { useEffect, useState, useContext } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { UserContext } from "./context/UserContext";
 
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -14,7 +16,6 @@ import EditProfilePage from "./pages/EditProfile";
 
 import EditUserPage from "./admin/EditUserPage";
 import AddUserPage from "./admin/AddUserPage";
-
 import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboard from "./admin/AdminDashboard";
 import ManageUsers from "./admin/ManageUsers";
@@ -24,11 +25,10 @@ import AdminProtectedRoute from "./components/AdminProtectedRoute";
 
 import UserLayout from "./layouts/UserLayout";
 
-// 👉 Make sure filename matches exactly
 import { loadMessages } from "./utils/messageloader";
 
 function App() {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const { user, loading } = useContext(UserContext);
   const [msgsReady, setMsgsReady] = useState(false);
 
   useEffect(() => {
@@ -39,7 +39,7 @@ function App() {
     init();
   }, []);
 
-  if (!msgsReady) {
+  if (!msgsReady || loading) {
     return (
       <div style={{
         width: "100%",
@@ -54,17 +54,16 @@ function App() {
     );
   }
 
-const getDefaultRoute = () => {
-  if (!user) return "/login";
+  const getDefaultRoute = () => {
+    if (!user) return "/login";
 
-  const roleId = Number(user.role_id);
+    const roleId = Number(user.role_id);
 
-  if (!isNaN(roleId) && roleId !== 2) {
-    return "/admin/dashboard";  // admin
-  }
-  return "/dashboard"; // user
-};
-
+    if (!isNaN(roleId) && roleId !== 2) {
+      return "/admin/dashboard";
+    }
+    return "/dashboard";
+  };
 
   return (
     <Routes>

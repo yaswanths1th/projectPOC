@@ -38,11 +38,19 @@
 }
 
 .export-btn {
-  background: white;
-  color: #1e293b;
-  border: 1px solid #cbd5e1;
+  background-color: #062c4d;      /* Blue */
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s;
 }
-.export-btn:hover { background: #f1f5f9; }
+
+.export-btn:hover {
+  background-color: #1565c0;     /* Darker blue */
+}
 
 .add-btn {
   background: #112c61;
