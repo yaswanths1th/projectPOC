@@ -104,7 +104,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             key="access_token",
             value=access,
             httponly=True,
-            secure=True,          # since DEBUG=True
+            secure=False,          # since DEBUG=True
             samesite="None",       # <-- FIX
             path="/",
 )
@@ -113,7 +113,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             key="refresh_token",
             value=refresh,
             httponly=True,
-            secure=True,
+            secure=False,
             samesite="None",
             path="/",
 )
@@ -138,7 +138,7 @@ def refresh_token_view(request):
     key="access_token",
     value=str(new_access),
     httponly=True,
-    secure=True,
+    secure=False,
     samesite="None",
     path="/",
 )

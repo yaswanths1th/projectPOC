@@ -1,10 +1,11 @@
 // frontend/src/pages/LoginPage.jsx
 
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import "./LoginPage.css";
-import { UserContext } from "../context/UserContext";
+
+const API_BASE = "http://localhost:8000";  // ⬅️ MATCHES src/api/axios.js
 
 function LoginPage() {
   const [username, setUsername] = useState("");
@@ -71,9 +72,9 @@ function LoginPage() {
     setMessageType("");
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/auth/login/", {
+      const res = await fetch(`${API_BASE}/api/auth/login/`, {
         method: "POST",
-        credentials: "include", // IMPORTANT for cookies
+        credentials: "include", // 🔑 allow cookies to be set
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
@@ -81,10 +82,7 @@ function LoginPage() {
       const data = await res.json().catch(() => ({}));
       console.log("LOGIN RESPONSE:", data);
 
-
-      // -------------------------
       // INVALID CREDENTIALS
-      // -------------------------
       if (!res.ok || !data.username) {
         const code = data.code || "EL001";
         const text =
@@ -97,9 +95,7 @@ function LoginPage() {
         return;
       }
 
-      // -------------------------
       // SUCCESS MESSAGE
-      // -------------------------
       const infoCode = data.code || "IL001";
       const successText =
         data.message ||
@@ -109,9 +105,7 @@ function LoginPage() {
       setMessage(successText);
       setMessageType("success");
 
-      // -------------------------
-      // STORE USER (no tokens!)
-      // -------------------------
+      // STORE BASIC USER SNAPSHOT (for quick UI)
       localStorage.setItem(
         "user",
         JSON.stringify({
@@ -124,57 +118,46 @@ function LoginPage() {
         })
       );
 
-      // -------------------------
-      // FORCE PASSWORD CHANGE
-      // -------------------------
-      if (data.force_password_change === true) {
-        setTimeout(() => {
-          navigate("/change-password", { replace: true });
-        }, 700);
-        return;
-      }
-
-      // -------------------------
-      // ROLE-BASED REDIRECT
-      // -------------------------
+      // ROLE-BASED REDIRECT (no extra API dependency here)
       setTimeout(async () => {
-  console.log("Redirect check:", data);
+        console.log("Redirect check:", data);
+        const roleId = Number(data.role_id);
 
-  const roleId = Number(data.role_id);
+        // If backend didn't send role_id → treat as normal user
+        if (isNaN(roleId)) {
+          navigate("/dashboard", { replace: true });
+          return;
+        }
 
-  // If backend didn't send role_id → treat as user
-  if (isNaN(roleId)) {
-    navigate("/dashboard", { replace: true });
-    return;
-  }
+        // ADMIN = any role_id except 2
+        if (roleId !== 2) {
+          navigate("/admin/dashboard", { replace: true });
+          return;
+        }
 
-  // ADMIN = any role_id except 2
-  if (roleId !== 2) {
-    navigate("/admin/dashboard", { replace: true });
-    return;
-  }
+        // USER = role_id === 2 → check address completeness
+        try {
+          const addrRes = await fetch(
+            `${API_BASE}/api/addresses/check/`,
+            {
+              method: "GET",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+            }
+          );
 
-  // USER = role_id === 2 → check address
-  try {
-    const addrRes = await fetch("http://127.0.0.1:8000/api/addresses/check/", {
-      method: "GET",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-    });
+          const addrData = await addrRes.json().catch(() => ({}));
+          console.log("Address check:", addrData);
 
-    const addrData = await addrRes.json();
-    console.log("Address check:", addrData);
-
-    if (addrRes.ok && addrData.has_address) {
-      navigate("/dashboard", { replace: true });
-    } else {
-      navigate("/addresses", { replace: true });
-    }
-  } catch {
-    navigate("/addresses", { replace: true });
-  }
-}, 700);
-
+          if (addrRes.ok && addrData.has_address) {
+            navigate("/dashboard", { replace: true });
+          } else {
+            navigate("/addresses", { replace: true });
+          }
+        } catch {
+          navigate("/addresses", { replace: true });
+        }
+      }, 700);
     } catch {
       let fallback = getErrorText("EA010");
       if (!fallback) fallback = "Unable to reach server. Please try again.";

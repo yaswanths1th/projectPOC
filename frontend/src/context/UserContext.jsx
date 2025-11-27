@@ -15,34 +15,29 @@ export default function UserProvider({ children }) {
 
   const [loading, setLoading] = useState(true);
 
-  // ------------------------------------------------
-  // Load authenticated user profile
-  // ------------------------------------------------
   const loadProfile = useCallback(async () => {
-  try {
-    const res = await api.get("/api/auth/profile/"); // automatically sends cookies
-    setUser(res.data);
-    localStorage.setItem("user", JSON.stringify(res.data));
-  } catch (err) {
-    // Silently ignore 401 instead of resetting user
-    if (!err.silent && err.response?.status !== 401) {
-      console.error("Profile load failed:", err);
+    try {
+      const res = await api.get("/api/auth/profile/");  // 🍪 reads access_token cookie
+      setUser(res.data);
+      localStorage.setItem("user", JSON.stringify(res.data));
+    } catch (err) {
+      // ignore 401 as 'not logged in'
+      if (!err.silent && err.response?.status !== 401) {
+        console.error("Profile load failed:", err);
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  }, []);
 
-
-  // ------------------------------------------------
-  // Run once at app load
-  // ------------------------------------------------
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
 
   return (
-    <UserContext.Provider value={{ user, setUser, loading, reloadUser: loadProfile }}>
+    <UserContext.Provider
+      value={{ user, setUser, loading, reloadUser: loadProfile }}
+    >
       {!loading && children}
     </UserContext.Provider>
   );

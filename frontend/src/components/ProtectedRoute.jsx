@@ -1,16 +1,15 @@
 // src/components/ProtectedRoute.jsx
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate } from "react-router-dom";
+import { useContext } from "react";
+import { UserContext } from "../context/UserContext";
 
 function ProtectedRoute({ children }) {
-  const token = localStorage.getItem("access");
-  const location = useLocation();
+  const { user, loading } = useContext(UserContext);
 
-  // 🔒 If no token found, redirect to login and remember where user came from
-  if (!token) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
-  }
+  if (loading) return null; // show nothing until profile loaded
 
-  // ✅ If logged in, allow access
+  if (!user) return <Navigate to="/login" replace />;
+
   return children;
 }
 
