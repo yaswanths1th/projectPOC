@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Edit2, Trash2 } from "lucide-react";
 import "./ManageUsers.css";
@@ -11,7 +11,7 @@ function ManageUsers() {
   // -------------------------
   // All states (declared up-front to keep Hook order stable)
   // -------------------------
-  const token = localStorage.getItem("access");
+  // 🔐 FIXED: No localStorage token - api instance uses cookies
 
   // Auth/admin verification
   const [authChecked, setAuthChecked] = useState(false);
@@ -66,16 +66,15 @@ function ManageUsers() {
 
   // -------------------------
   // Permission checker (uses token)
-  // -------------------------
+  // Permission checker (uses cookies via api)
   const checkPermission = useCallback(
     async (codename) => {
-      if (!token) return false;
       try {
-        const res = await axios.get(
-          "http://127.0.0.1:8000/api/permissions/has_permission/",
+        // 🔐 FIXED: Using secure api instance with cookies
+        const res = await api.get(
+          "/permissions/has_permission/",
           {
             params: { codename },
-            headers: { Authorization: `Bearer ${token}` },
           }
         );
         return res.data?.has === true;
@@ -83,7 +82,7 @@ function ManageUsers() {
         return false;
       }
     },
-    [token]
+    []
   );
 
   // -------------------------
@@ -100,9 +99,8 @@ function ManageUsers() {
       }
 
       try {
-        const res = await axios.get("http://127.0.0.1:8000/api/auth/profile/", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // 🔐 FIXED: Using secure api instance with cookies
+        const res = await api.get("/auth/profile/");
         const data = res.data || {};
         const backendIsAdmin = Boolean(
           data.is_staff || data.is_superuser || data.is_admin
@@ -117,14 +115,13 @@ function ManageUsers() {
           navigate("/dashboard", { replace: true });
         }
       } catch (err) {
-        // If tokens invalid -> clean and go to login
-        localStorage.clear();
+        // If session invalid -> go to login
         navigate("/login", { replace: true });
       }
     };
 
     verifyUser();
-  }, [token, navigate]);
+  }, [navigate]);
 
   // -------------------------
   // Load permissions only after authChecked && isAdmin === true
@@ -173,7 +170,8 @@ function ManageUsers() {
   // -------------------------
   const loadRoles = useCallback(async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:8000/api/auth/roles/");
+      // 🔐 FIXED: Using secure api instance with cookies
+      const res = await api.get("/auth/roles/");
       setRoles(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       showToast("Failed loading roles", "error");
@@ -183,9 +181,8 @@ function ManageUsers() {
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        "http://127.0.0.1:8000/api/auth/admin/users/",
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await api.get(
+        "/auth/admin/users/"
       );
 
       const raw = Array.isArray(res.data) ? res.data : res.data.results || [];
@@ -195,9 +192,8 @@ function ManageUsers() {
           const roleObj = roles.find((r) => Number(r.id) === Number(u.role));
           let address = {};
           try {
-            const addrRes = await axios.get(
-              `http://127.0.0.1:8000/api/addresses/?user=${u.id}`,
-              { headers: { Authorization: `Bearer ${token}` } }
+            const addrRes = await api.get(
+              `/addresses/?user=${u.id}`
             );
             if (Array.isArray(addrRes.data) && addrRes.data.length > 0) {
               address = addrRes.data[0];
@@ -299,9 +295,9 @@ function ManageUsers() {
   const handleDelete = async () => {
     if (!userToDelete) return;
     try {
-      await axios.delete(
-        `http://127.0.0.1:8000/api/auth/admin/users/${userToDelete.id}/`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      // 🔐 FIXED: Using secure api instance with cookies
+      await api.delete(
+        `/auth/admin/users/${userToDelete.id}/`
       );
       setUsers((prev) => prev.filter((x) => x.id !== userToDelete.id));
       showToast("User deleted successfully", "success");

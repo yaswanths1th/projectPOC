@@ -7,6 +7,7 @@ import {
   Settings,
   LogOut,
 } from "lucide-react";
+import api from "../api/axios";
 import "./AdminLayout.css";
 
 export default function AdminLayout() {
@@ -14,25 +15,13 @@ export default function AdminLayout() {
   const [adminName, setAdminName] = useState("Admin");
   const [initial, setInitial] = useState("A");
   const [avatarColor, setAvatarColor] = useState("#0b2349");
-  const token = localStorage.getItem("access");
 
   useEffect(() => {
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-
     const fetchProfile = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/auth/profile/", {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch profile");
-        const data = await res.json();
+        // 🔐 FIXED: Using secure api instance with cookies
+        const res = await api.get("/auth/profile/");
+        const data = res.data;
 
         const name =
           data.first_name || data.last_name
@@ -45,11 +34,12 @@ export default function AdminLayout() {
         setAvatarColor(generateColor(first));
       } catch (err) {
         console.error("Profile fetch error:", err);
+        navigate("/login");
       }
     };
 
     fetchProfile();
-  }, [token, navigate]);
+  }, [navigate]);
 
   const generateColor = (char) => {
     const colors = [
@@ -67,9 +57,8 @@ export default function AdminLayout() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("access");
-    localStorage.removeItem("refresh");
-    localStorage.removeItem("user");
+    // 🔐 FIXED: No localStorage token storage needed
+    // Cookies are automatically cleared by backend logout endpoint
     navigate("/login");
   };
 

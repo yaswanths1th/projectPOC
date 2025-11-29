@@ -1,7 +1,7 @@
 // frontend/src/pages/EditProfilePage.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import api from "../utils/api";
 import "./EditProfilePage.css";
 
 // ==============================
@@ -26,7 +26,7 @@ export default function EditProfilePage() {
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
 
-  const token = localStorage.getItem("access");
+  // 🔐 FIXED: No localStorage token - api instance uses cookies
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -143,16 +143,14 @@ export default function EditProfilePage() {
 
     const loadAll = async () => {
       try {
-        const userRes = await axios.get(
-          "http://127.0.0.1:8000/api/auth/profile/",
-          { headers: { Authorization: `Bearer ${token}` } }
+        const userRes = await api.get(
+          "/auth/profile/"
         );
         setUser(userRes.data);
 
         // address
-        const addrRes = await axios.get(
-          "http://127.0.0.1:8000/api/addresses/",
-          { headers: { Authorization: `Bearer ${token}` } }
+        const addrRes = await api.get(
+          "/addresses/"
         );
 
         if (Array.isArray(addrRes.data) && addrRes.data.length > 0)
@@ -161,11 +159,11 @@ export default function EditProfilePage() {
           setAddress(addrRes.data);
 
         // departments + roles
-        const deptRes = await axios.get(
-          "http://127.0.0.1:8000/api/auth/departments/"
+        const deptRes = await api.get(
+          "/auth/departments/"
         );
-        const rolesRes = await axios.get(
-          "http://127.0.0.1:8000/api/auth/roles/"
+        const rolesRes = await api.get(
+          "/auth/roles/"
         );
 
         setDepartments(deptRes.data || []);
@@ -176,7 +174,7 @@ export default function EditProfilePage() {
     };
 
     loadAll();
-  }, [navigate, token]);
+  }, [navigate]);
 
   // ------------------ FILTER ROLES ------------------
   useEffect(() => {
@@ -379,21 +377,17 @@ export default function EditProfilePage() {
       if (payload.role)
         payload.role = Number(payload.role);
 
-      await axios.put("http://127.0.0.1:8000/api/auth/profile/", payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // 🔐 FIXED: Using secure api instance with cookies
+      await api.put("/auth/profile/", payload);
 
       // address
       const addrUrl = address.id
-        ? `http://127.0.0.1:8000/api/addresses/${address.id}/`
-        : "http://127.0.0.1:8000/api/addresses/";
+        ? `/addresses/${address.id}/`
+        : "/addresses/";
 
-      await axios({
-        method: address.id ? "put" : "post",
-        url: addrUrl,
-        data: address,
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const addressRes = address.id 
+        ? await api.put(addrUrl, address)
+        : await api.post(addrUrl, address);
 
       const msg = await getInfoText(address.id ? "IA004" : "IA001");
       setSuccessMsg(msg);

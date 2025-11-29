@@ -1,45 +1,28 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
+import api from "../utils/api";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("access");
-  const storedUser = JSON.parse(localStorage.getItem("user"));
-
   const [profile, setProfile] = useState(null);
   const [addressExists, setAddressExists] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) {
-      navigate("/login");
-      return;
-    }
     loadDashboard();
   }, []);
 
   const loadDashboard = async () => {
     try {
+      // 🔐 FIXED: Using secure api instance with cookies
       // ✅ Fetch Profile
-      const resProfile = await fetch("http://127.0.0.1:8000/api/auth/profile/", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const dataProfile = await resProfile.json();
-      setProfile(dataProfile);
+      const resProfile = await api.get("/auth/profile/");
+      setProfile(resProfile.data);
 
       // ✅ Check Address
-      const resAddr = await fetch("http://127.0.0.1:8000/api/addresses/check/", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const dataAddr = await resAddr.json();
-      setAddressExists(dataAddr.has_address);
+      const resAddr = await api.get("/addresses/check/");
+      setAddressExists(resAddr.data.has_address);
     } catch (error) {
       console.error("User dashboard load error:", error);
     } finally {
@@ -58,7 +41,7 @@ export default function Dashboard() {
         {/* HEADER */}
         <section className="welcome-section">
           <h1 className="welcome-text">
-            Welcome, {profile?.first_name || storedUser.username} 👋
+            Welcome, {profile?.first_name || profile?.username} 👋
           </h1>
           <p className="subtitle">Here is your account overview</p>
         </section>
@@ -89,7 +72,8 @@ export default function Dashboard() {
             >
               <div className="stat-info">
                 <h2>{addressExists ? "✓" : "—"}</h2>
-                <p>Address Added</p>
+                <p>{addressExists ? "Address Added" : "Add Address"}</p>
+                
               </div>
             </div>
 

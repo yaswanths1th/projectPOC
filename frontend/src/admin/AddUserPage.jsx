@@ -1,7 +1,7 @@
 // frontend/src/pages/AddUserPage.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios";
 import "./AddUserPage.css";
 
 /**
@@ -24,7 +24,6 @@ import "./AddUserPage.css";
 
 function AddUserPage() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("access");
 
   const [user, setUser] = useState({
     username: "",
@@ -165,8 +164,8 @@ function AddUserPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const d = await axios.get("http://127.0.0.1:8000/api/auth/departments/");
-        const r = await axios.get("http://127.0.0.1:8000/api/auth/roles/");
+        const d = await api.get("/auth/departments/");
+        const r = await api.get("/auth/roles/");
         setDepartments(Array.isArray(d.data) ? d.data : []);
         setRoles(Array.isArray(r.data) ? r.data : []);
       } catch {
@@ -296,9 +295,8 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
   const checkUsernameUnique = async (usernameVal) => {
     if (!usernameVal || !USERNAME_RE.test(usernameVal)) return;
     try {
-      const res = await axios.get("http://127.0.0.1:8000/api/auth/check-username/", {
+      const res = await api.get("/auth/check-username/", {
         params: { username: usernameVal },
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const exists = Boolean(res.data?.exists);
       if (exists) {
@@ -315,9 +313,8 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
   const checkEmailUnique = async (emailVal) => {
     if (!emailVal || !EMAIL_RE.test(emailVal)) return;
     try {
-      const res = await axios.get("http://127.0.0.1:8000/api/auth/check-email/", {
+      const res = await api.get("/auth/check-email/", {
         params: { email: emailVal },
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const exists = Boolean(res.data?.exists);
       if (exists) {
@@ -399,10 +396,9 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
 
     try {
       // create user
-      const res = await axios.post(
-        "http://127.0.0.1:8000/api/auth/admin/users/",
-        { ...user, department: user.department ? Number(user.department) : null, role: user.role ? Number(user.role) : null },
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      const res = await api.post(
+        "/auth/admin/users/",
+        { ...user, department: user.department ? Number(user.department) : null, role: user.role ? Number(user.role) : null }
       );
 
       const created = res.data;
@@ -411,10 +407,9 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
       // save address if some address values present
       const hasAddress = Object.values(address).some((v) => v && String(v).trim());
       if (hasAddress && userId) {
-        await axios.post(
-          "http://127.0.0.1:8000/api/addresses/",
-          { ...address, user: userId },
-          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+        await api.post(
+          "/addresses/",
+          { ...address, user: userId }
         );
       }
 

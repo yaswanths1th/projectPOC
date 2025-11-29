@@ -1,14 +1,8 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import "./AdminSettings.css";
 
 export default function AdminSettings() {
-  const token = localStorage.getItem("access");
-
-  const API = axios.create({
-    baseURL: "http://127.0.0.1:8000/api/auth/",
-    headers: { Authorization: `Bearer ${token}` },
-  });
 
   const [departments, setDepartments] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -34,8 +28,8 @@ export default function AdminSettings() {
   };
 
   const loadData = async () => {
-    const d = await API.get("departments/");
-    const r = await API.get("roles/");
+    const d = await api.get("/auth/departments/");
+    const r = await api.get("/auth/roles/");
     setDepartments(d.data);
     setRoles(r.data);
   };
@@ -45,7 +39,7 @@ export default function AdminSettings() {
     if (!newDept.trim()) return showMessage("Enter department name");
 
     try {
-      await API.post("departments/", { department_name: newDept });
+      await api.post("/auth/departments/", { department_name: newDept });
       setNewDept("");
       loadData();
       showMessage("Department added successfully");
@@ -58,7 +52,7 @@ export default function AdminSettings() {
   // UPDATE DEPARTMENT
   const saveDepartment = async () => {
     try {
-      await API.put(`departments/${selectedDeptForEdit.id}/`, {
+      await api.put(`/auth/departments/${selectedDeptForEdit.id}/`, {
         department_name: editDeptName,
       });
       setSelectedDeptForEdit(null);
@@ -74,7 +68,7 @@ export default function AdminSettings() {
   // DELETE DEPARTMENT
   const deleteDepartment = async () => {
     try {
-      await API.delete(`departments/${selectedDeptForEdit.id}/`);
+      await api.delete(`/auth/departments/${selectedDeptForEdit.id}/`);
       setSelectedDeptForEdit(null);
       setEditDeptName("");
       loadData();
@@ -89,7 +83,7 @@ export default function AdminSettings() {
     if (!newRole.trim()) return showMessage("Enter role name");
 
     try {
-      await API.post("roles/", {
+      await api.post("/auth/roles/", {
         role_name: newRole,
         department: selectedDeptForRoles.id,
       });
@@ -106,7 +100,7 @@ export default function AdminSettings() {
   // UPDATE ROLE
   const saveRole = async () => {
     try {
-      await API.put(`roles/${editRoleId}/`, { role_name: editRoleName });
+      await api.put(`/auth/roles/${editRoleId}/`, { role_name: editRoleName });
       setEditRoleId(null);
       setEditRoleName("");
       loadData();
@@ -120,7 +114,7 @@ export default function AdminSettings() {
   // DELETE ROLE
   const deleteRole = async (id) => {
     try {
-      await API.delete(`roles/${id}/`);
+      await api.delete(`/auth/roles/${id}/`);
       loadData();
       showMessage("Role deleted");
     } catch {

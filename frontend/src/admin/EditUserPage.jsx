@@ -1,7 +1,7 @@
 // frontend/src/pages/EditUserPage.jsx
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../api/axios";
 import "./EditUserPage.css";
 
 /**
@@ -59,7 +59,6 @@ function EditUserPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const token = localStorage.getItem("access");
   const navigate = useNavigate();
   const { id } = useParams();
 
@@ -132,19 +131,15 @@ function EditUserPage() {
   // -------------------------
   const loadUserData = useCallback(async () => {
     try {
-      const res = await axios.get(`http://127.0.0.1:8000/api/auth/admin/users/${id}/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // 🔐 FIXED: Using secure api instance with cookies
+      const res = await api.get(`/auth/admin/users/${id}/`);
       setUser({
-  ...res.data,
-  username_original: res.data.username,
-  email_original: res.data.email,
-});
-
-
-      const addrRes = await axios.get(`http://127.0.0.1:8000/api/addresses/?user=${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        ...res.data,
+        username_original: res.data.username,
+        email_original: res.data.email,
       });
+
+      const addrRes = await api.get(`/addresses/?user=${id}`);
 
       const a = Array.isArray(addrRes.data) && addrRes.data.length ? addrRes.data[0] : addrRes.data;
       if (a && typeof a === "object") {
@@ -168,13 +163,14 @@ function EditUserPage() {
         setErrors((p) => ({ ...p, general: msg }));
       })();
     }
-  }, [id, token]); //[id, token, getErrorText]);
+  }, [id]); //[id, token, getErrorText]);
 
   const loadDropdowns = useCallback(async () => {
     try {
-      const deptRes = await axios.get("http://127.0.0.1:8000/api/auth/departments/");
+      // 🔐 FIXED: Using secure api instance with cookies
+      const deptRes = await api.get("/auth/departments/");
       setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
-      const rolesRes = await axios.get("http://127.0.0.1:8000/api/auth/roles/");
+      const rolesRes = await api.get("/auth/roles/");
       setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : []);
     } catch {
       // ignore; optional
@@ -186,10 +182,9 @@ function EditUserPage() {
   }, []);
 
   useEffect(() => {
-    if (!token) return navigate("/login");
     loadDropdowns();
     loadUserData();
-  }, [loadDropdowns, loadUserData, navigate, token]);
+  }, [loadDropdowns, loadUserData]);
 
   // -------------------------
   // Filter roles by department
@@ -318,9 +313,8 @@ function EditUserPage() {
   }
 
   try {
-    const res = await axios.get("http://127.0.0.1:8000/api/auth/check-username/", {
+    const res = await api.get("/auth/check-username/", {
       params: { username: usernameVal },
-      headers: { Authorization: `Bearer ${token}` },
     });
     const exists = Boolean(res.data?.exists);
 
@@ -350,9 +344,8 @@ function EditUserPage() {
   }
 
   try {
-    const res = await axios.get("http://127.0.0.1:8000/api/auth/check-email/", {
+    const res = await api.get("/auth/check-email/", {
       params: { email: emailVal },
-      headers: { Authorization: `Bearer ${token}` },
     });
     const exists = Boolean(res.data?.exists);
 
@@ -450,23 +443,21 @@ function EditUserPage() {
 
     try {
       // PUT user
-      await axios.put(
-        `http://127.0.0.1:8000/api/auth/admin/users/${id}/`,
+      await api.put(
+        `/auth/admin/users/${id}/`,
         {
           ...user,
           department: user.department ? Number(user.department) : null,
           role: user.role ? Number(user.role) : null,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
+        }
       );
 
       // Save address
-      const addrUrl = address.id ? `http://127.0.0.1:8000/api/addresses/${address.id}/` : "http://127.0.0.1:8000/api/addresses/";
-      await axios({
+      const addrUrl = address.id ? `/addresses/${address.id}/` : "/addresses/";
+      await api({
         method: address.id ? "put" : "post",
         url: addrUrl,
         data: { ...address, user: id },
-        headers: { Authorization: `Bearer ${token}` },
       });
 
       // success message (IA004 update, IA001 created)

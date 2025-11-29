@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import "../layouts/AdminLayout.css";
 import "./AdminDashboard.css";
 import { useNavigate } from "react-router-dom";
@@ -15,43 +15,6 @@ export default function AdminDashboard() {
 
   const navigate = useNavigate();
 
-  const API = axios.create({
-    baseURL: "http://127.0.0.1:8000/api/",
-  });
-
-  API.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-      const originalRequest = error.config;
-
-      if (
-        error.response?.status === 401 &&
-        !originalRequest._retry &&
-        localStorage.getItem("refresh")
-      ) {
-        originalRequest._retry = true;
-
-        try {
-          const refreshToken = localStorage.getItem("refresh");
-          const res = await axios.post("http://127.0.0.1:8000/api/auth/token/refresh/", {
-            refresh: refreshToken,
-          });
-
-          localStorage.setItem("access", res.data.access);
-          API.defaults.headers.common["Authorization"] = `Bearer ${res.data.access}`;
-          originalRequest.headers["Authorization"] = `Bearer ${res.data.access}`;
-          return API(originalRequest);
-        } catch {
-          localStorage.removeItem("access");
-          localStorage.removeItem("refresh");
-          window.location.href = "/login";
-        }
-      }
-
-      return Promise.reject(error);
-    }
-  );
-
   useEffect(() => {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 10000);
@@ -63,11 +26,7 @@ export default function AdminDashboard() {
     setError("");
 
     try {
-      const token = localStorage.getItem("access");
-
-      const res = await API.get("auth/admin/stats/", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get("/auth/admin/stats/");
 
       const data = res.data;
 

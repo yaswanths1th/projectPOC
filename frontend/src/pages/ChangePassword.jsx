@@ -1,7 +1,7 @@
 // frontend/src/pages/ChangePassword.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import api from "../utils/api";
 import "./ChangePassword.css";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -29,7 +29,7 @@ export default function ChangePassword() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const token = localStorage.getItem("access");
+  // 🔐 FIXED: No localStorage token - api instance uses cookies
 
   // redirect path depending on admin/user route
   const redirectTo = location.pathname.startsWith("/admin")
@@ -176,14 +176,14 @@ export default function ChangePassword() {
     if (!okOld || !okNew || !okConfirm) return;
 
     try {
-      await axios.post(
-        "http://127.0.0.1:8000/api/change-password/change-password/",
+      // 🔐 FIXED: Using secure api instance with cookies
+      await api.post(
+        "/change-password/change-password/",
         {
           old_password: form.old_password,
           new_password: form.new_password,
           confirm_password: form.confirm_password,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
+        }
       );
 
       // success code ICP001 (from cache only)

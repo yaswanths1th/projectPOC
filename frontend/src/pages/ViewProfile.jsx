@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./ViewProfilePage.css";
-import axios from "axios";
+import api from "../utils/api";
 
 function ViewProfile() {
   const [user, setUser] = useState({});
@@ -9,8 +9,7 @@ function ViewProfile() {
   const [departments, setDepartments] = useState([]);
   const [roles, setRoles] = useState([]);
 
-  const token = localStorage.getItem("access");
-  const storedUser = JSON.parse(localStorage.getItem("user"));
+  // 🔐 FIXED: No localStorage token needed - Cookies sent automatically
 
   const navigate = useNavigate();
   const { userId } = useParams();
@@ -26,31 +25,25 @@ function ViewProfile() {
   };
 
   useEffect(() => {
-    if (!token) return navigate("/login");
-
     const fetchData = async () => {
       try {
+        // 🔐 FIXED: Using secure api instance with cookies
         const userUrl = isViewingOtherUser
-          ? `http://127.0.0.1:8000/api/auth/admin/users/${userId}/`
-          : `http://127.0.0.1:8000/api/auth/profile/`;
+          ? `/auth/admin/users/${userId}/`
+          : `/auth/profile/`;
 
-        const userRes = await axios.get(userUrl, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const userRes = await api.get(userUrl);
         setUser(userRes.data);
 
         if (!isViewingOtherUser) {
-          const addrRes = await axios.get(
-            "http://127.0.0.1:8000/api/addresses/",
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+          const addrRes = await api.get("/addresses/");
           if (Array.isArray(addrRes.data) && addrRes.data.length > 0) {
             setAddress(addrRes.data[0]);
           }
         }
 
-        const deptRes = await axios.get("http://127.0.0.1:8000/api/auth/departments/");
-        const rolesRes = await axios.get("http://127.0.0.1:8000/api/auth/roles/");
+        const deptRes = await api.get("/auth/departments/");
+        const rolesRes = await api.get("/auth/roles/");
 
         setDepartments(deptRes.data);
         setRoles(rolesRes.data);
@@ -61,7 +54,7 @@ function ViewProfile() {
     };
 
     fetchData();
-  }, [token, navigate, isViewingOtherUser, userId]);
+  }, [navigate, isViewingOtherUser, userId]);
 
   const getDepartmentName = () => {
     const dept = departments.find((d) => d.id === user.department);

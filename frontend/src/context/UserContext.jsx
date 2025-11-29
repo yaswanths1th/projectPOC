@@ -1,5 +1,5 @@
 import React, { createContext, useEffect, useState } from "react";
-import axios from "axios";
+import { getProfile } from "../api/auth";
 
 export const UserContext = createContext();
 
@@ -10,12 +10,15 @@ export default function UserProvider({ children }) {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const token = localStorage.getItem("access");
-        if (token) {
-          const res = await axios.get("http://127.0.0.1:8000/api/me/", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          setUser(res.data);
+        // 🔐 Call profile API instead of checking localStorage
+        // Backend will verify cookies and return user data
+        const response = await getProfile();
+        
+        if (response.ok && response.data) {
+          setUser(response.data);
+        } else {
+          // Session invalid or cookies expired
+          setUser(null);
         }
       } catch (error) {
         console.error("User fetch failed:", error);
@@ -24,6 +27,7 @@ export default function UserProvider({ children }) {
         setLoading(false);
       }
     };
+
     fetchUser();
   }, []);
 

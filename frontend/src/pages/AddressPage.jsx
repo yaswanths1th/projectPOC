@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AddressPage.css";
+import api from "../utils/api";
 
 export default function AddressPage() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("access");
+  // 🔐 FIXED: No localStorage token - api instance uses cookies
 
   const [existingId, setExistingId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,13 +32,6 @@ export default function AddressPage() {
 
   const [errors, setErrors] = useState({});
   const [successMsg, setSuccessMsg] = useState("");
-
-  // Redirect if not logged in
-  useEffect(() => {
-    if (!token) navigate("/login");
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // -----------------------------
   // LOAD MESSAGE TABLES
@@ -106,15 +100,14 @@ export default function AddressPage() {
 
   // -----------------------------
   // LOAD EXISTING ADDRESS
-  // -----------------------------
+  // ------------------------------
   useEffect(() => {
     const loadAddress = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/addresses/", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // 🔐 FIXED: Using secure api instance with cookies
+        const res = await api.get("/addresses/");
 
-        const data = await res.json();
+        const data = res.data;
 
         if (Array.isArray(data) && data.length > 0) {
           const a = data[0];
@@ -249,35 +242,31 @@ export default function AddressPage() {
     if (!ok) return;
 
     const url = existingId
-      ? `http://127.0.0.1:8000/api/addresses/${existingId}/`
-      : "http://127.0.0.1:8000/api/addresses/";
+      ? `/addresses/${existingId}/`
+      : "/addresses/";
 
     try {
-      const res = await fetch(url, {
-        method: existingId ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(form),
-      });
+      // 🔐 FIXED: Using secure api instance with cookies
+      const res = existingId 
+        ? await api.put(url, form)
+        : await api.post(url, form);
 
-      if (res.ok) {
+      if (res.status === 200 || res.status === 201) {
         setSuccessMsg(existingId ? getInfoText("IA002") : getInfoText("IA001"));
         setTimeout(() => navigate("/profile", { replace: true }), 1200);
         return;
       }
-
-      const backend = await res.json();
+    } catch (err) {
+      const backend = err.response?.data;
       const newErr = {};
 
-      Object.keys(backend).forEach((k) => {
-        newErr[k] = String(backend[k]);
-      });
+      if (backend && typeof backend === "object") {
+        Object.keys(backend).forEach((k) => {
+          newErr[k] = String(backend[k]);
+        });
+      }
 
       setErrors(newErr);
-    } catch {
-      setErrors({ general: getErrorText("EA012") });
     }
   };
 
