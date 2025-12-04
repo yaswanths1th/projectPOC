@@ -1,9 +1,11 @@
+// src/layouts/UserLayout.jsx
 import React from "react";
 import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   FiHome,
   FiUser,
   FiLogOut,
+  FiCpu
 } from "react-icons/fi";
 import "./UserLayout.css";
 
@@ -38,6 +40,22 @@ export default function UserLayout() {
               <FiUser className="icon" /> Profile
             </Link>
           </li>
+
+          {/* Plans */}
+          <li className={location.pathname === "/account/plans" ? "active" : ""}>
+            <Link to="/account/plans">
+              <FiCpu className="icon" /> Plans
+            </Link>
+          </li>
+
+          {/* AI link — show only if storedUser.subscription.can_use_ai is true */}
+          {storedUser?.subscription?.can_use_ai && (
+            <li className={location.pathname === "/account/ai" ? "active" : ""}>
+              <Link to="/account/ai">
+                <FiCpu className="icon" /> AI Chat
+              </Link>
+            </li>
+          )}
         </ul>
       </aside>
 

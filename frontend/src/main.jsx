@@ -4,13 +4,17 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 
-import "./axiosConfig";   // <-- ADD THIS LINE
+import "./axiosConfig";
 import "./index.css";
+
+import UserProvider from "./context/UserContext"; // default export present
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <UserProvider>
+        <App />
+      </UserProvider>
     </BrowserRouter>
   </React.StrictMode>
 );

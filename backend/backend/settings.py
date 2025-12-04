@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "apps.password_reset",
     "apps.viewprofile",
     "apps.change_password",
+    "apps.subscriptions",
 ]
 
 MIDDLEWARE = [
@@ -142,3 +143,4 @@ DEFAULT_FROM_EMAIL = "janamahi2010@gmail.com"
 
 OTP_EXPIRY_MINUTES = 5
 #CORS_ALLOW_ALL_ORIGINS = True
+HF_API_TOKEN = os.getenv("HF_API_TOKEN")

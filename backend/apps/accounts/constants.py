@@ -25,7 +25,7 @@ DEFAULT_MESSAGES = {
         # General / Network / Server
         "EA009": "Server not reachable. Please try again later.",
         "EA010": "An unexpected error occurred. Please try again.",
-        "EF001": "Email not registered.",
+        "EF001": "Email not registereddfdf.",
 "EF002": "OTP must contain 6 digits.",
 "EF003": "New password and confirm password do not match.",
 "EF004": "Session ended. Please request a new code.",

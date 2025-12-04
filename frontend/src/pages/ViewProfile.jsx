@@ -9,9 +9,11 @@ function ViewProfile() {
   const [address, setAddress] = useState({});
   const [departments, setDepartments] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [canEditProfile, setCanEditProfile] = useState(false);
+  const [canChangePassword, setCanChangePassword] = useState(false);
 
   const token = localStorage.getItem("access");
-  const storedUser = JSON.parse(localStorage.getItem("user"));
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
 
   const navigate = useNavigate();
   const { userId } = useParams();
@@ -35,11 +37,50 @@ function ViewProfile() {
           ? `${API_URL}/api/auth/admin/users/${userId}/`
           : `${API_URL}/api/auth/profile/`;
 
+        // Fetch profile
         const userRes = await axios.get(userUrl, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setUser(userRes.data);
+        const fetchedUser = userRes.data;
+        setUser(fetchedUser);
 
+        // Determine plan-based permissions:
+        // 1) Prefer subscription flags from fetched user (user.subscription)
+        // 2) Else use localStorage storedUser.subscription
+        // 3) Else try to fetch plans list and match on slug
+        let editFlag = false;
+        let passFlag = false;
+
+        if (fetchedUser?.subscription) {
+          // if API returns subscription with the flags
+          editFlag = !!fetchedUser.subscription.can_edit_profile;
+          passFlag = !!fetchedUser.subscription.can_change_password;
+        } else if (storedUser?.subscription) {
+          editFlag = !!storedUser.subscription.can_edit_profile;
+          passFlag = !!storedUser.subscription.can_change_password;
+        } else {
+          // fallback: try fetching plans list and infer from slug if present
+          const slug = (fetchedUser?.subscription?.slug) || (storedUser?.subscription?.slug) || null;
+          if (slug) {
+            try {
+              const plansRes = await axios.get(`${API_URL}/api/plans/`);
+              const plans = Array.isArray(plansRes.data) ? plansRes.data : [];
+              const matched = plans.find(p => p.slug === slug);
+              if (matched) {
+                editFlag = !!matched.can_edit_profile;
+                passFlag = !!matched.can_change_password;
+              }
+            } catch (e) {
+              // Ignore plan fetch failures (we'll keep defaults)
+              console.warn("Failed to fetch plans to infer permissions:", e);
+            }
+          }
+        }
+
+        setCanEditProfile(editFlag);
+        setCanChangePassword(passFlag);
+
+        // Address fetch when viewing own profile
         if (!isViewingOtherUser) {
           const addrRes = await axios.get(
             `${API_URL}/api/addresses/`,
@@ -50,6 +91,7 @@ function ViewProfile() {
           }
         }
 
+        // load departments & roles (these appear to be public in your current code)
         const deptRes = await axios.get(`${API_URL}/api/auth/departments/`);
         const rolesRes = await axios.get(`${API_URL}/api/auth/roles/`);
 
@@ -62,7 +104,7 @@ function ViewProfile() {
     };
 
     fetchData();
-  }, [token, navigate, isViewingOtherUser, userId]);
+  }, [token, navigate, isViewingOtherUser, userId, storedUser]);
 
   const getDepartmentName = () => {
     const dept = departments.find((d) => d.id === user.department);
@@ -94,14 +136,19 @@ function ViewProfile() {
         </h2>
 
         <div className="header-actions">
+          {/* Only show edit/change password for own profile AND if plan allows OR if admin */}
           {!isViewingOtherUser && (
             <>
-              <button className="edit-btn" onClick={handleEdit}>
-                Edit Details
-              </button>
-              <button className="pass-btn" onClick={handleChangePassword}>
-                Change Password
-              </button>
+              { (isAdminLoggedIn || canEditProfile) && (
+                <button className="edit-btn" onClick={handleEdit}>
+                  Edit Details
+                </button>
+              )}
+              { (isAdminLoggedIn || canChangePassword) && (
+                <button className="pass-btn" onClick={handleChangePassword}>
+                  Change Password
+                </button>
+              )}
             </>
           )}
         </div>

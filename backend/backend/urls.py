@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
+from apps.subscriptions import views as subscription_views
+
 
 
 urlpatterns = [
@@ -23,6 +25,10 @@ urlpatterns = [
     # 👤 User profile & Admin user management
     path("api/viewprofile/", include("apps.viewprofile.urls")),
      path('api/permissions/', include('apps.accounts.urls_permissions')),  # <- new
+    path('api/', include('apps.subscriptions.urls')),
+    path('accounts/', include('apps.subscriptions.urls')),
+    path('api/auth/profile/', subscription_views.profile_view, name='api-auth-profile'),
+    
 
     
 ]

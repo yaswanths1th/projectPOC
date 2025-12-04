@@ -1,3 +1,4 @@
+// src/App.jsx
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
@@ -26,6 +27,10 @@ import UserLayout from "./layouts/UserLayout";
 
 // 👉 Make sure filename matches exactly
 import { loadMessages } from "./utils/messageloader";
+// add these imports near the others
+import PlansPage from "./pages/PlansPage";
+import AIChat from "./pages/AIChat";
+import BillingPage from "./pages/BillingPage"; // <-- ADDED
 
 function App() {
   const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -54,16 +59,16 @@ function App() {
     );
   }
 
-const getDefaultRoute = () => {
-  if (!user) return "/login";
+  const getDefaultRoute = () => {
+    if (!user) return "/login";
 
-  const roleId = Number(user.role_id);
+    const roleId = Number(user.role_id);
 
-  if (!isNaN(roleId) && roleId !== 2) {
-    return "/admin/dashboard";  // admin
-  }
-  return "/dashboard"; // user
-};
+    if (!isNaN(roleId) && roleId !== 2) {
+      return "/admin/dashboard";  // admin
+    }
+    return "/dashboard"; // user
+  };
 
 
   return (
@@ -90,6 +95,9 @@ const getDefaultRoute = () => {
         <Route path="addresses" element={<AddressPage />} />
         <Route path="edit-profile" element={<EditProfilePage isAdminRoute={false} />} />
         <Route path="change-password" element={<ChangePassword />} />
+        <Route path="account/plans" element={<PlansPage />} />
+        <Route path="account/ai" element={<AIChat />} />
+        <Route path="billing" element={<BillingPage />} /> {/* <-- ADDED */}
       </Route>
 
       {/* Admin routes */}

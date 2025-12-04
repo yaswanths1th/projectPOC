@@ -1,175 +1,174 @@
 // frontend/src/pages/LoginPage.jsx
-import { useState, useEffect } from "react";
+import React, { useState, useContext } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import "./LoginPage.css";
 import { API_URL } from "../config/api";
+import { UserContext } from "../context/UserContext";
 
-const FALLBACK_CODES = {
-  LOGIN_FAILED: "EL001",
-  LOGIN_SUCCESS: "IL001",
-  SERVER_ERROR: "EA010",
-};
+const VERBOSE = true; // set false to silence console logs
 
-const PERMISSIONS_KEY = "permissions";
-
-function LoginPage() {
+export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState(""); // error | success
+  const { setUser } = useContext(UserContext);
   const navigate = useNavigate();
 
-  const [msgTables, setMsgTables] = useState({
-    user_error: {},
-    user_information: {},
-    user_validation: {},
-  });
-
-  // Normalizing message tables
-  const normalize = (maybeArr, type) => {
-    if (!maybeArr) return {};
-    const map = {};
-    if (Array.isArray(maybeArr)) {
-      for (const item of maybeArr) {
-        if (!item) continue;
-        if (type === "error" && item.error_code)
-          map[item.error_code.toUpperCase()] = item.error_message || "";
-        if (type === "info" && item.information_code)
-          map[item.information_code.toUpperCase()] = item.information_text || "";
-        if (type === "validation" && item.validation_code)
-          map[item.validation_code.toUpperCase()] =
-            item.validation_message || "";
+  // helper to try multiple URLs for subscription/profile (robustness)
+  async function tryFetchCandidates(candidates = [], init = {}) {
+    for (const url of candidates) {
+      try {
+        const r = await fetch(url, init);
+        const text = await r.text().catch(() => "");
+        let json = null;
+        try { json = text ? JSON.parse(text) : null; } catch { json = null; }
+        if (VERBOSE) console.log("tryFetchCandidates:", url, r.status, json ?? text);
+        // return both status and parsed json (or raw text)
+        return { ok: r.ok, status: r.status, data: json, raw: text, url };
+      } catch (err) {
+        if (VERBOSE) console.warn("tryFetchCandidates failed for", url, err);
+        // continue to next candidate
       }
     }
-    return map;
-  };
+    return { ok: false, status: null, data: null, raw: null, url: null };
+  }
 
-  // Load cached message tables
-  useEffect(() => {
-    try {
-      const e = JSON.parse(localStorage.getItem("user_error") || "[]");
-      const i = JSON.parse(localStorage.getItem("user_information") || "[]");
-      const v = JSON.parse(localStorage.getItem("user_validation") || "[]");
-      setMsgTables({
-        user_error: normalize(e, "error"),
-        user_information: normalize(i, "info"),
-        user_validation: normalize(v, "validation"),
-      });
-    } catch {
-      setMsgTables({ user_error: {}, user_information: {}, user_validation: {} });
-    }
-  }, []);
-
-  const getErrorText = (code) =>
-    msgTables.user_error[(code || "").toUpperCase()] || "";
-  const getInfoText = (code) =>
-    msgTables.user_information[(code || "").toUpperCase()] || "";
-
-  // ---------------------------
-  // LOGIN HANDLER
-  // ---------------------------
   const handleLogin = async (e) => {
     e.preventDefault();
     setMessage("");
-    setMessageType("");
 
     try {
-      const res = await fetch(`${API_URL}/api/auth/login/`, {
+      const loginRes = await fetch(`${API_URL}/api/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const loginJson = await (async () => {
+        try { return await loginRes.json(); } catch { return {}; }
+      })();
 
-      // Invalid credentials
-      if (!res.ok || !data.access) {
+      if (!loginRes.ok || !loginJson.access) {
+        setMessage(loginJson.message || "Login failed");
+        // clear potential stale state
         localStorage.removeItem("access");
         localStorage.removeItem("refresh");
-        localStorage.removeItem(PERMISSIONS_KEY);
-
-        const code =
-          (data.code && String(data.code)) || FALLBACK_CODES.LOGIN_FAILED;
-        const text =
-          data.message || getErrorText(code) || "Invalid credentials.";
-
-        setMessage(text);
-        setMessageType("error");
+        localStorage.removeItem("user");
         return;
       }
 
-      // Success message
-      const infoCode =
-        (data.code && String(data.code)) || FALLBACK_CODES.LOGIN_SUCCESS;
-      setMessage(
-        data.message || getInfoText(infoCode) || "Login successful."
-      );
-      setMessageType("success");
+      // Save tokens immediately
+      localStorage.setItem("access", loginJson.access);
+      if (loginJson.refresh) localStorage.setItem("refresh", loginJson.refresh);
 
-      // Store tokens
-      localStorage.setItem("access", data.access);
-      if (data.refresh) localStorage.setItem("refresh", data.refresh);
+      // Build headers for subsequent calls
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${loginJson.access}` };
 
-      // Store permissions
- localStorage.setItem(
-  "user",
-  JSON.stringify({
-    username: data.username,
-    email: data.email,
-    is_admin: data.is_admin,
-    role_id: data.role_id,
-    role_name: data.role_name,
-    permissions: data.permissions || []
-  })
-);
+      // Try to fetch canonical profile from common candidate endpoints
+      const profileCandidates = [
+        `${API_URL}/api/auth/profile/`,
+        `${API_URL}/api/profile/`,
+        `${API_URL}/profile/`,
+        `${API_URL}/accounts/profile/`,
+      ];
+      const profileResult = await tryFetchCandidates(profileCandidates, { method: "GET", headers });
 
+      let profile = profileResult.data || null;
+      if (!profile) {
+        // fallback to minimal profile from login response
+        profile = {
+          username: loginJson.username || username,
+          email: loginJson.email || "",
+          role_id: loginJson.role_id || null,
+          role_name: loginJson.role_name || null,
+          is_admin: loginJson.is_admin || false,
+          permissions: loginJson.permissions || [],
+        };
+      }
 
-      const token = data.access;
+      // Try to fetch subscription from candidate endpoints (some backends return 204)
+      const subscriptionCandidates = [
+        `${API_URL}/api/subscription/`,
+        `${API_URL}/subscription/`,
+        `${API_URL}/api/subscriptions/current/`,
+        `${API_URL}/api/subscription/subscription/`,
+      ];
+      const subResult = await tryFetchCandidates(subscriptionCandidates, { method: "GET", headers });
 
-      // -------------------------------------
-      // ROLE-BASED REDIRECT
-      // -------------------------------------
+      let subscription = null;
+      if (subResult.status === 204) {
+        subscription = { slug: "free", can_use_ai: false };
+      } else if (subResult.data) {
+        // backend may return either {slug:..., can_use_ai:...} or full detail
+        subscription = subResult.data;
+      } else {
+        // Last attempt: maybe profile contained subscription
+        subscription = profile.subscription || null;
+      }
+
+      // Normalise subscription object: we only need slug and can_use_ai for UI
+      if (subscription) {
+        if (typeof subscription === "string") {
+          subscription = { slug: subscription, can_use_ai: false };
+        } else if (subscription.slug) {
+          // already fine
+        } else {
+          // try to derive slug from possible shapes
+          if (subscription.plan && subscription.plan.slug) {
+            subscription = { slug: subscription.plan.slug, can_use_ai: !!subscription.plan.can_use_ai };
+          } else if (subscription.name && typeof subscription.name === "string") {
+            subscription = { slug: subscription.name.toLowerCase(), can_use_ai: !!subscription.can_use_ai };
+          } else {
+            subscription = { slug: "free", can_use_ai: false };
+          }
+        }
+      } else {
+        subscription = { slug: "free", can_use_ai: false };
+      }
+
+      // Attach canonical subscription to profile
+      profile.subscription = subscription;
+
+      // Persist canonical user exactly once
+      try {
+        localStorage.setItem("user", JSON.stringify(profile));
+      } catch (e) {
+        console.warn("Failed to write user to localStorage:", e);
+      }
+
+      // Update context so UI re-renders
+      if (setUser) setUser(profile);
+
+      if (VERBOSE) {
+        console.log("[Login] loginResponse:", loginJson);
+        console.log("[Login] profile fetched from:", profileResult.url, profileResult.status, profileResult.data);
+        console.log("[Login] subscription fetched from:", subResult.url, subResult.status, subResult.data);
+        console.log("[Login] final persisted profile:", profile);
+      }
+
+      setMessage("Login successful");
+
+      // Route user as before
+      const roleId = Number(profile.role_id || loginJson.role_id || 0);
       setTimeout(async () => {
-        const roleId = Number(data.role_id); // always parse safely
-
-        // ADMIN = any role except 2
         if (!isNaN(roleId) && roleId !== 2) {
           navigate("/admin/dashboard", { replace: true });
           return;
         }
-
-        // USER = role_id === 2 → normal dashboard/address flow
         try {
-          const addrRes = await fetch(
-            `${API_URL}/api/addresses/check/`,
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
+          const addrRes = await fetch(`${API_URL}/api/addresses/check/`, { method: "GET", headers });
           const addrData = await addrRes.json().catch(() => ({}));
-
-          if (addrRes.ok && addrData.has_address) {
-            navigate("/dashboard", { replace: true });
-          } else {
-            navigate("/addresses", { replace: true });
-          }
+          if (addrRes.ok && addrData.has_address) navigate("/dashboard", { replace: true });
+          else navigate("/addresses", { replace: true });
         } catch {
           navigate("/addresses", { replace: true });
         }
-      }, 700);
-    } catch {
-      const fallback =
-        getErrorText(FALLBACK_CODES.SERVER_ERROR) ||
-        "Server error. Please try again.";
-      setMessage(fallback);
-      setMessageType("error");
+      }, 600);
+    } catch (err) {
+      console.error("Login error:", err);
+      setMessage("Server error");
     }
   };
 
@@ -179,58 +178,23 @@ function LoginPage() {
         <h2>Login</h2>
 
         <form onSubmit={handleLogin} className="login-form" noValidate>
-          <input
-            className="login-input"
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
+          <input className="login-input" type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
 
           <div className="password-wrapper">
-            <input
-              className="login-input"
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <span
-              className="password-toggle"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? <FiEyeOff /> : <FiEye />}
-            </span>
+            <input className="login-input" type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <span className="password-toggle" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <FiEyeOff /> : <FiEye />}</span>
           </div>
 
-          {message && (
-            <p
-              className={`login-message ${
-                messageType === "error" ? "error-text" : "success-text"
-              }`}
-            >
-              {message}
-            </p>
-          )}
+          {message && <p className={`login-message ${message === "Login successful" ? "success-text" : "error-text"}`}>{message}</p>}
 
-          <button className="login-button" type="submit">
-            Login
-          </button>
+          <button className="login-button" type="submit">Login</button>
         </form>
 
         <div className="login-links">
-          <p>
-            <Link to="/forgot-password">Forgot password?</Link>
-          </p>
-          <p>
-            Don’t have an account? <Link to="/register">Register</Link>
-          </p>
+          <p><Link to="/forgot-password">Forgot password?</Link></p>
+          <p>Don’t have an account? <Link to="/register">Register</Link></p>
         </div>
       </div>
     </div>
   );
 }
-
-export default LoginPage;
