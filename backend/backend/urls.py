@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/', include('apps.subscriptions.urls')),
     path('accounts/', include('apps.subscriptions.urls')),
     path('api/auth/profile/', subscription_views.profile_view, name='api-auth-profile'),
+    path('api/subscriptions/', include('apps.subscriptions.urls')),
     
 
     

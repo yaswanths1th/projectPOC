@@ -2,126 +2,204 @@
 import os
 import logging
 import requests
+from django.apps import apps
 
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+from rest_framework import permissions
 
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.contrib.auth import get_user_model
 
-from .models import Plan, UserSubscription
-from .serializers import PlanSerializer, UserSubscriptionSerializer, UserProfileSerializer
+from .serializers import (
+    PlanSerializer,
+    UserSubscriptionSerializer,
+    UserProfileSerializer,
+    CreateSubscriptionSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
+# Helpers to find models robustly
+def get_model(label_candidates, model_name):
+    for lbl in label_candidates:
+        try:
+            return apps.get_model(lbl, model_name)
+        except LookupError:
+            continue
+    for lbl in ("subscriptions", "apps.subscriptions", "apps.subscriptions.models"):
+        try:
+            return apps.get_model(lbl, model_name)
+        except LookupError:
+            continue
+    return None
 
+def get_user_subscription_model():
+    return get_model(["apps.subscriptions", "subscriptions"], "UserSubscription")
+
+def get_plan_model():
+    m = get_model(["apps.subscriptions", "subscriptions"], "Plan")
+    if m is None:
+        m = get_model(["apps.subscriptions", "subscriptions"], "SubscriptionPlan")
+    return m
+
+# ----------------------------
+# Public endpoints
+# ----------------------------
 @api_view(['GET'])
 def plans_list(request):
-    """Public: list all active plans"""
+    Plan = get_plan_model()
+    if Plan is None:
+        return Response([], status=status.HTTP_200_OK)
     plans = Plan.objects.filter(is_active=True).order_by('price_cents')
     serializer = PlanSerializer(plans, many=True)
     return Response(serializer.data)
 
+# ----------------------------
+# Subscription endpoints
+# ----------------------------
+class SubscribeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def subscribe_view(request):
-    plan_slug = request.data.get('plan_slug')
-    if not plan_slug:
-        return Response({"detail": "plan_slug is required"}, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request):
+        serializer = CreateSubscriptionSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        sub = serializer.save()
 
-    # don't create 'free' as an active subscription through this endpoint
-    if str(plan_slug).strip().lower() == "free":
-        sub = UserSubscription.objects.filter(user=request.user, active=True).order_by('-start_date').first()
-        if sub:
-            return Response({"subscription": {
-                "id": sub.id,
-                "slug": sub.plan.slug,
-                "name": sub.plan.name,
-                "is_active": True,
-                "start_date": sub.start_date,
-                "end_date": sub.end_date,
-                "can_use_ai": bool(sub.plan.can_use_ai)
-            }}, status=status.HTTP_200_OK)
-        return Response({"subscription": {"slug": "free", "can_use_ai": False}}, status=status.HTTP_200_OK)
-
-    plan = get_object_or_404(Plan, slug=plan_slug, is_active=True)
-
-    payment_provider = request.data.get('payment_provider')
-    payment_reference = request.data.get('payment_reference')
-
-    with transaction.atomic():
-        # deactivate previous active subscriptions
-        UserSubscription.objects.filter(user=request.user, active=True).update(active=False, status='expired')
-
-        # create new active subscription
-        new_sub = UserSubscription.objects.create(
-            user=request.user,
-            plan=plan,
-            active=True,
-            status='active',
-            payment_provider=payment_provider or None,
-            payment_reference=payment_reference or None
-        )
-
-        # set start_date / end_date based on plan.interval
+        # Build a subscription payload
         try:
-            new_sub.start_date = timezone.now()
-            new_sub.end_date = new_sub.set_expiry_for_interval()  # adapt if your method sets expires / end_date
-            new_sub.save(update_fields=['start_date', 'end_date', 'active', 'status', 'expires_at'])
+            subscription_data = UserSubscriptionSerializer(sub).data
         except Exception:
-            logger.exception("Failed to set expiry on subscription")
+            subscription_data = {
+                "id": getattr(sub, "id", None),
+                "user_id": getattr(sub, "user_id", None),
+                "plan_id": getattr(sub, "plan_id", None),
+                "status": getattr(sub, "status", None),
+                "active": getattr(sub, "active", getattr(sub, "is_active", True)),
+                "start_date": getattr(sub, "start_date", getattr(sub, "started_at", None)),
+                "end_date": getattr(sub, "end_date", getattr(sub, "expires_at", None)),
+                "auto_renew": getattr(sub, "auto_renew", False),
+                "payment_provider": getattr(sub, "payment_provider", None),
+                "payment_reference": getattr(sub, "payment_reference", None)
+            }
 
-    # build response payload
-    subscription_payload = {
-        "id": new_sub.id,
-        "slug": new_sub.plan.slug,
-        "name": new_sub.plan.name,
-        "is_active": bool(new_sub.active),
-        "start_date": new_sub.start_date.isoformat() if new_sub.start_date else None,
-        "end_date": new_sub.end_date.isoformat() if getattr(new_sub, 'end_date', None) else (new_sub.expires_at.isoformat() if new_sub.expires_at else None),
-        "can_use_ai": bool(new_sub.plan.can_use_ai),
-        "price_cents": getattr(new_sub.plan, 'price_cents', None),
-    }
+        # Re-fetch the user from DB to ensure fresh relations (including subscription)
+        User = get_user_model()
+        try:
+            fresh_user = User.objects.get(pk=request.user.pk)
+        except Exception:
+            fresh_user = request.user  # fallback
 
-    # return canonical subscription (and optionally updated user profile)
-    user_serialized = UserProfileSerializer(request.user).data
-    return Response({"user": user_serialized, "subscription": subscription_payload}, status=status.HTTP_201_CREATED)
+        # Try to return an enriched profile (this serializer includes subscription info)
+        try:
+            user_profile = UserProfileSerializer(fresh_user).data
+        except Exception:
+            # fallback to simple user serializer if available
+            try:
+                from apps.accounts.serializers import UserSerializer
+                user_profile = UserSerializer(fresh_user).data
+            except Exception:
+                user_profile = None
 
+        response_payload = {"subscription": subscription_data}
+        if user_profile:
+            response_payload["user"] = user_profile
 
+        return Response(response_payload, status=status.HTTP_200_OK)
+    
+
+    
+class SubscriptionDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        UserSubscription = get_user_subscription_model()
+        if UserSubscription is None:
+            return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+        # filter using 'active' boolean field (fall back to 'is_active' if necessary)
+        try:
+            sub = UserSubscription.objects.filter(user_id=request.user.id, active=True).order_by("-started_at").first()
+        except Exception:
+            sub = UserSubscription.objects.filter(user_id=request.user.id).order_by("-started_at").first()
+
+        if not sub:
+            return Response(None, status=status.HTTP_204_NO_CONTENT)
+        out = None
+        try:
+            out = UserSubscriptionSerializer(sub).data
+        except Exception:
+            out = {
+                "id": getattr(sub, "id", None),
+                "user_id": getattr(sub, "user_id", None),
+                "plan_id": getattr(sub, "plan_id", None),
+                "plan_slug": getattr(getattr(sub, "plan", None), "slug", None),
+                "status": getattr(sub, "status", None),
+                "active": getattr(sub, "active", getattr(sub, "is_active", True)),
+                "started_at": getattr(sub, "started_at", getattr(sub, "start_date", None)),
+                "end_date": getattr(sub, "end_date", getattr(sub, "expires_at", None)),
+                "auto_renew": getattr(sub, "auto_renew", False),
+                "payment_provider": getattr(sub, "payment_provider", None),
+                "payment_reference": getattr(sub, "payment_reference", None),
+            }
+        return Response(out, status=status.HTTP_200_OK)
+
+# ----------------------------
+# Profile + helper endpoints
+# ----------------------------
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
-    """Return serialized authenticated user profile (UserProfileSerializer)."""
     serializer = UserProfileSerializer(request.user)
     return Response(serializer.data, status=status.HTTP_200_OK)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_subscription(request):
-    sub = UserSubscription.objects.filter(user=request.user, active=True).order_by('-start_date', '-created_at').first()
+    UserSubscription = get_user_subscription_model()
+    if UserSubscription is None:
+        return Response({"slug": "free", "can_use_ai": False}, status=200)
+
+    # try filter by 'active' then 'is_active' then fallback to any
+    sub = None
+    try:
+        sub = UserSubscription.objects.filter(user=request.user, active=True).order_by('-started_at', '-created_at').first()
+
+    except Exception:
+        try:
+            sub = UserSubscription.objects.filter(user=request.user, is_active=True).order_by('-started_at', '-created_at').first()
+        except Exception:
+            sub = UserSubscription.objects.filter(user=request.user).order_by('-started_at', '-created_at').first()
+
     if not sub:
         return Response({"slug": "free", "can_use_ai": False}, status=200)
 
+    plan = getattr(sub, "plan", None)
+    plan_slug = getattr(plan, "slug", None)
+    plan_name = getattr(plan, "name", None)
+    can_use_ai = bool(getattr(plan, "can_use_ai", False))
+    price_cents = getattr(plan, "price_cents", None)
+
+    end_date = getattr(sub, "end_date", None) or getattr(sub, "expires_at", None) or None
+
     return Response({
-        "id": sub.id,
-        "slug": sub.plan.slug,
-        "name": sub.plan.name,
-        "is_active": bool(sub.active),
-        "start_date": sub.start_date.isoformat() if sub.start_date else None,
-        "end_date": sub.end_date.isoformat() if getattr(sub, 'end_date', None) else (sub.expires_at.isoformat() if sub.expires_at else None),
-        "can_use_ai": bool(sub.plan.can_use_ai),
-        "price_cents": getattr(sub.plan, 'price_cents', None)
+        "id": getattr(sub, "id", None),
+        "slug": plan_slug,
+        "name": plan_name,
+        "active": bool(getattr(sub, "active", getattr(sub, "is_active", True))),
+        "start_date": getattr(sub, "started_at", getattr(sub, "start_date", None)).isoformat() if getattr(sub, "started_at", getattr(sub, "start_date", None)) else None,
+        "end_date": end_date.isoformat() if end_date else None,
+        "can_use_ai": can_use_ai,
+        "price_cents": price_cents
     }, status=200)
 
-
-# ---------------------------
-# AI proxy endpoint left intact (unchanged logic)
-# ---------------------------
-
+# ----------------------------
+# AI proxy endpoint (unchanged logic)
+# ----------------------------
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
@@ -192,7 +270,6 @@ def ai_free_chat(request):
         logger.exception("Failed to parse JSON from Gemini response")
         return Response({"detail": "Invalid response from Gemini API", "body": resp.text}, status=status.HTTP_502_BAD_GATEWAY)
 
-    # extract text (various shapes)
     reply = None
     try:
         candidates = data.get("candidates") if isinstance(data, dict) else None

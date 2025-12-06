@@ -1,15 +1,12 @@
-// src/pages/AIChat.jsx
-import React, { useState, useContext, useRef, useEffect } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import axios from "axios";
 import { API_URL } from "../config/api";
 import { UserContext } from "../context/UserContext";
 import "./AIChat.css";
 
 /**
- * AIChat component
- * - Tries multiple backend endpoints for proxied AI route
- * - Detects AI availability from a few backend response shapes
- * - Provides helpful error messages and test retry behavior
+ * AIChat component — scroll behavior removed, full-bleed layout (no left/right gaps).
+ * All original networking/logic preserved.
  */
 
 export default function AIChat() {
@@ -18,10 +15,10 @@ export default function AIChat() {
   const [messages, setMessages] = useState([]); // { role, text, ts }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const chatRef = useRef(null);
 
+  // Removed auto-scroll effect and chatRef usage per request
   useEffect(() => {
-    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    // intentionally left empty — no auto-scroll
   }, [messages, loading]);
 
   // Read canonical user (context preferred, fallback to localStorage)
@@ -75,7 +72,7 @@ export default function AIChat() {
       try {
         const r = await axios.get(endpoint, { headers: { Authorization: `Bearer ${token}` }, timeout: 7000 });
         if (r && r.data) {
-          try { setUser && setUser(r.data); localStorage.setItem("user", JSON.stringify(r.data)); } catch (e) {/* ignore */}
+          try { setUser && setUser(r.data); localStorage.setItem("user", JSON.stringify(r.data)); } catch (e) {/* ignore */ }
           return r.data;
         }
       } catch (e) { /* try next */ }
@@ -197,24 +194,96 @@ export default function AIChat() {
     return <div className="system-msg">{m.text}</div>;
   }
 
-  // If local user lacks AI, show upgrade prompt but still allow test call UI
+  // If local user lacks AI, show upgrade prompt but still allow test call UI (no scrolling)
   if (!canUseAI) {
     return (
-      <div className="ai-container">
-        <div className="ai-upgrade-msg">
-          AI access is not enabled for your current subscription.
-          <br />
-          {localUser ? "Please upgrade to Enterprise to use AI chat (or use test send below)." : "Please log in first."}
+      <div className="ai-fullscreen-noscroll">
+        <main className="ai-main-noscroll">
+          <header className="ai-main-header">
+            <h2 className="ai-title">AI Chat</h2>
+            <div className="ai-user-info">{localUser?.email ?? localUser?.username ?? "User"}</div>
+          </header>
+
+          <div className="ai-upgrade-msg boxed">
+            AI access is not enabled for your current subscription.
+            <br />
+            {localUser ? "Please upgrade to Enterprise to use AI chat (or use test send below)." : "Please log in first."}
+          </div>
+
+          <div className="ai-chat-area-noscroll">
+            <div className="messages-list">
+              {messages.map((m, i) => (<div key={i}>{renderBubble(m)}</div>))}
+              {loading && (
+                <div className="typing-row">
+                  <div className="bot-avatar">AI</div>
+                  <div className="typing">AI is typing...</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="ai-composer-noscroll">
+            {error && <div className="ai-error">{error}</div>}
+
+            <textarea
+              className="ai-input"
+              rows={3}
+              value={prompt}
+              placeholder="Type your message... (Enter to send)"
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+
+            <div className="ai-controls">
+              <div className="msg-count">{messages.length} messages</div>
+              <div className="controls-right">
+                <button className="btn btn-clear" onClick={() => { setMessages([]); setError(null); }}>Clear</button>
+                <button className="btn btn-send" onClick={handleSend} disabled={loading || !prompt.trim()}>
+                  {loading ? "Sending..." : "Send (test)"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Normal allowed UI (fullscreen, no scroll)
+  return (
+    <div className="ai-fullscreen-noscroll">
+      <main className="ai-main-noscroll">
+        <header className="ai-main-header">
+          <div className="ai-left">
+            <h2 className="ai-title">AI Chat</h2>
+            <div className="ai-sub">Ask anything — messages are proxied to your backend AI endpoint.</div>
+          </div>
+          <div className="ai-right">
+            <div className="ai-user-info">{localUser?.email ?? localUser?.username ?? "User"}</div>
+          </div>
+        </header>
+
+        <div className="ai-chat-area-noscroll">
+          {messages.length === 0 && <div className="ai-placeholder">Start the conversation...</div>}
+          <div className="messages-list">
+            {messages.map((m, i) => (<div key={i}>{renderBubble(m)}</div>))}
+            {loading && (
+              <div className="typing-row">
+                <div className="bot-avatar">AI</div>
+                <div className="typing">AI is typing...</div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="ai-input-area" style={{ marginTop: 12 }}>
+        <div className="ai-composer-noscroll">
           {error && <div className="ai-error">{error}</div>}
 
           <textarea
             className="ai-input"
-            rows={3}
+            rows={2}
             value={prompt}
-            placeholder="Type your message... (Enter to send)"
+            placeholder="Type your message... (Enter to send, Shift+Enter newline)"
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
           />
@@ -224,58 +293,12 @@ export default function AIChat() {
             <div className="controls-right">
               <button className="btn btn-clear" onClick={() => { setMessages([]); setError(null); }}>Clear</button>
               <button className="btn btn-send" onClick={handleSend} disabled={loading || !prompt.trim()}>
-                {loading ? "Sending..." : "Send (test)"}
+                {loading ? 'Sending...' : 'Send'}
               </button>
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  // Normal allowed UI
-  return (
-    <div className="ai-container">
-      <header className="ai-header">
-        <h2 className="ai-title">AI Chat</h2>
-        <div className="ai-user-info">{localUser?.email ?? localUser?.username ?? "User"}</div>
-      </header>
-
-      <div ref={chatRef} className="ai-chat-box">
-        {messages.length === 0 && <div className="ai-placeholder">Start the conversation...</div>}
-        <div className="messages-list">
-          {messages.map((m, i) => (<div key={i}>{renderBubble(m)}</div>))}
-          {loading && (
-            <div className="typing-row">
-              <div className="bot-avatar">AI</div>
-              <div className="typing">AI is typing...</div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="ai-input-area">
-        {error && <div className="ai-error">{error}</div>}
-
-        <textarea
-          className="ai-input"
-          rows={3}
-          value={prompt}
-          placeholder="Type your message... (Enter to send, Shift+Enter newline)"
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
-
-        <div className="ai-controls">
-          <div className="msg-count">{messages.length} messages</div>
-          <div className="controls-right">
-            <button className="btn btn-clear" onClick={() => { setMessages([]); setError(null); }}>Clear</button>
-            <button className="btn btn-send" onClick={handleSend} disabled={loading || !prompt.trim()}>
-              {loading ? 'Sending...' : 'Send'}
-            </button>
-          </div>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -10,9 +10,7 @@ const VERBOSE = true;
 
 function normalizeSubscription(sub) {
   if (!sub) return null;
-  // If backend returns an object with slug etc -> keep
   if (typeof sub === "object") {
-    // Some backends return nested shapes: { id, plan: { slug, ... }, slug, name, ... }
     if (!sub.slug && sub.plan && sub.plan.slug) {
       return {
         id: sub.id ?? null,
@@ -25,7 +23,6 @@ function normalizeSubscription(sub) {
         price_cents: sub.price_cents ?? sub.plan?.price_cents ?? null,
       };
     }
-    // If already has slug, map minimal canonical fields
     if (sub.slug) {
       return {
         id: sub.id ?? null,
@@ -39,12 +36,9 @@ function normalizeSubscription(sub) {
       };
     }
   }
-
-  // If backend returned a plain string like "free"
   if (typeof sub === "string") {
     return { slug: sub, name: sub, can_use_ai: false, is_active: true };
   }
-
   return null;
 }
 
@@ -53,12 +47,12 @@ export default function UserProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const PROFILE_URL = `${API_URL}/api/auth/profile/`;
-  const SUBSCRIPTION_URL = `${API_URL}/api/subscription/`;
+  // <-- point this to the subscriptions app detail endpoint
+  const SUBSCRIPTION_URL = `${API_URL}/api/subscriptions/`;
 
   const fetchCanonicalUser = useCallback(async ({ force = false } = {}) => {
     setLoading(true);
 
-    // short-circuit: if no token and not forcing a refresh, use stored user (do not overwrite)
     const token = localStorage.getItem("access");
     if (!token) {
       if (VERBOSE) console.log("[UserContext] no token found; clearing runtime user");
@@ -73,7 +67,7 @@ export default function UserProvider({ children }) {
     let fetchedSubscription = null;
     let gotAuthoritativeData = false;
 
-    // 1) profile
+    // profile
     try {
       const pRes = await axios.get(PROFILE_URL, { headers, timeout: 7000 });
       fetchedProfile = pRes?.data ?? null;
@@ -88,10 +82,9 @@ export default function UserProvider({ children }) {
       fetchedProfile = null;
     }
 
-    // 2) subscription
+    // subscription
     try {
       const sRes = await axios.get(SUBSCRIPTION_URL, { headers, timeout: 7000 });
-      // If server returns 204 No Content, treat as null (fallback to free)
       if (sRes.status === 204) {
         fetchedSubscription = null;
       } else {
@@ -108,13 +101,11 @@ export default function UserProvider({ children }) {
       fetchedSubscription = null;
     }
 
-    // 3) build finalUser
     let finalUser = null;
 
     if (fetchedProfile) {
       finalUser = { ...fetchedProfile };
     } else {
-      // don't overwrite stored user unless we fetched something authoritative
       try {
         finalUser = JSON.parse(localStorage.getItem("user") || "null");
         if (VERBOSE) console.log("[UserContext] using stored user as fallback:", finalUser);
@@ -125,21 +116,17 @@ export default function UserProvider({ children }) {
 
     if (!finalUser) finalUser = {};
 
-    // attach normalized subscription only if we fetched one; otherwise keep existing subscription if present
     const normSub = normalizeSubscription(fetchedSubscription);
     if (normSub) {
       finalUser.subscription = normSub;
     } else if (!finalUser.subscription && gotAuthoritativeData) {
-      // if we fetched profile but no subscription, set default free
       finalUser.subscription = { slug: "free", name: "Free", can_use_ai: false, is_active: true };
     } else {
-      // if we didn't fetch anything authoritative, DO NOT overwrite finalUser.subscription
       if (VERBOSE && !gotAuthoritativeData) {
         console.log("[UserContext] no authoritative data fetched; not overwriting stored subscription.");
       }
     }
 
-    // Persist canonical user only if we fetched at least profile or subscription (authoritative)
     if (gotAuthoritativeData) {
       try {
         localStorage.setItem("user", JSON.stringify(finalUser));
@@ -156,13 +143,11 @@ export default function UserProvider({ children }) {
     return finalUser;
   }, [PROFILE_URL, SUBSCRIPTION_URL]);
 
-  // initial load
   useEffect(() => {
     fetchCanonicalUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // expose refresh function for manual testing
   useEffect(() => {
     try {
       window.__refreshUser = async () => {

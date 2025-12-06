@@ -1,7 +1,7 @@
 // frontend/src/pages/PlansPage.jsx
 import React, { useEffect, useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { fetchPlans, subscribeToPlan } from "../api/plansApi";
+import { fetchPlans, subscribeToPlan, getCurrentSubscription } from "../api/plansApi";
 import { UserContext } from "../context/UserContext";
 import "./PlansPage.css";
 
@@ -127,21 +127,68 @@ export default function PlansPage() {
       const serverUser = res?.data?.user || null;
       const serverSubscription = res?.data?.subscription || null;
 
+      // 1) If backend returned a canonical user, persist it and update context
       if (serverUser) {
-        setUser && setUser(serverUser);
-        localStorage.setItem("user", JSON.stringify(serverUser));
-      } else if (serverSubscription) {
-        const existing = JSON.parse(localStorage.getItem("user") || "{}");
-        const merged = { ...(existing || {}), subscription: serverSubscription };
-        setUser && setUser(merged);
-        localStorage.setItem("user", JSON.stringify(merged));
-      } else {
-        // fallback optimistic update if absolutely necessary
+        try {
+          setUser && setUser(serverUser);
+          localStorage.setItem("user", JSON.stringify(serverUser));
+          console.log("[PlansPage] persisted server user after subscribe:", serverUser);
+        } catch (e) {
+          console.warn("[PlansPage] failed persisting server user:", e);
+        }
+      }
+      // 2) If backend returned only a subscription object, merge into existing stored user
+      else if (serverSubscription) {
+        try {
+          const existing = JSON.parse(localStorage.getItem("user") || "{}");
+          const merged = { ...(existing || {}), subscription: serverSubscription };
+          setUser && setUser(merged);
+          localStorage.setItem("user", JSON.stringify(merged));
+          console.log("[PlansPage] merged server subscription into local user:", serverSubscription);
+        } catch (e) {
+          console.warn("[PlansPage] failed merging server subscription:", e);
+        }
+      }
+      // 3) Fallback optimistic update (existing behavior)
+      else {
         const chosenPlan = plans.find(p => p.slug === plan_slug);
         const canUseAI = !!(chosenPlan ? chosenPlan.can_use_ai : (plan_slug === "enterprise"));
         const updatedUser = { ...(user || {}), subscription: { slug: plan_slug, can_use_ai: canUseAI } };
         setUser && setUser(updatedUser);
-        localStorage.setItem("user", JSON.stringify(updatedUser));
+        try { localStorage.setItem("user", JSON.stringify(updatedUser)); } catch (e) { console.warn(e); }
+        console.log("[PlansPage] optimistic local update:", updatedUser);
+      }
+
+      // 4) FORCE authoritative refresh from server so logout/login will reflect correct subscription.
+      try {
+        if (typeof window !== "undefined" && typeof window.__refreshUser === "function") {
+          const fresh = await window.__refreshUser();
+          if (fresh) {
+            try {
+              setUser && setUser(fresh);
+              localStorage.setItem("user", JSON.stringify(fresh));
+              console.log("[PlansPage] refreshed canonical user from server after subscribe:", fresh);
+            } catch (e) {
+              console.warn("[PlansPage] failed to persist refreshed user:", e);
+            }
+          }
+        } else {
+          // fallback: call the /api/subscription/ endpoint and merge
+          try {
+            const maybeSub = await getCurrentSubscription();
+            if (maybeSub) {
+              const existing = JSON.parse(localStorage.getItem("user") || "{}");
+              const merged = { ...(existing || {}), subscription: maybeSub };
+              setUser && setUser(merged);
+              localStorage.setItem("user", JSON.stringify(merged));
+              console.log("[PlansPage] fetched /api/subscription/ fallback:", maybeSub);
+            }
+          } catch (e) {
+            console.warn("[PlansPage] fallback subscription fetch failed:", e);
+          }
+        }
+      } catch (e) {
+        console.warn("[PlansPage] refreshUser call failed:", e);
       }
 
       const chosenPlan = plans.find(p => p.slug === plan_slug);
@@ -201,7 +248,7 @@ export default function PlansPage() {
               <div className="plan-price">{money(p.price_cents)}</div>
 
               <ul className="plan-features">
-                <li>{p.can_use_ai ? "Access to AI" : "No AI access"}</li>
+                <li>{p.can_use_ai ? "Access to AI Chat bot" : "No AI Chat bot"}</li>
                 {typeof p.can_edit_profile !== "undefined" && (
                   <li>{p.can_edit_profile ? "Edit profile" : "Cannot edit profile"}</li>
                 )}

@@ -72,7 +72,8 @@ export async function subscribeToPlan(planSlug, opts = {}) {
     `${base}/api/subscribe/`,
     `${base}/api/subscription/subscribe/`,
     `${base}/accounts/subscribe/`,
-    `${base}/subscribe/`
+    `${base}/subscribe/`,
+    `${base}/api/subscriptions/subscribe/`
   ];
 
   const payload = { plan_slug: planSlug };
