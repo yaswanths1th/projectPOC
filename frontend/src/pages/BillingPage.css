@@ -1,0 +1,154 @@
+.billing-page {
+  padding: 22px;
+  display: flex;
+  justify-content: center;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+.billing-card {
+  width: 100%;
+  max-width: 560px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(17, 24, 39, 0.06);
+  padding: 20px;
+  border: 1px solid #eef2f6;
+}
+
+.billing-title {
+  margin: 0 0 12px 0;
+  font-size: 20px;
+}
+
+.plan-summary {
+  border: 1px dashed #e6eef6;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  background: #fbfdff;
+}
+
+.plan-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  align-items: center;
+}
+
+.label {
+  color: #556170;
+  font-size: 14px;
+}
+
+.value {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.plan-price {
+  font-size: 16px;
+}
+
+.plan-name {
+  color: #0b6b4f;
+}
+
+.plan-slug {
+  color: #475569;
+  font-weight: 600;
+  text-transform: lowercase;
+  opacity: 0.85;
+}
+
+.billing-form {
+  margin-top: 12px;
+}
+
+.field {
+  margin-bottom: 12px;
+}
+
+.field-label {
+  font-size: 13px;
+  color: #4b5563;
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d7df;
+  outline: none;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  box-shadow: 0 0 0 4px rgba(6, 95, 70, 0.06);
+  border-color: #0b6b4f;
+}
+
+.msg {
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.msg.error {
+  background: #fff0f0;
+  border: 1px solid #ffdddd;
+  color: #8b1e1e;
+}
+
+.msg.success {
+  background: #f1fffa;
+  border: 1px solid #c8f3df;
+  color: #06684b;
+  font-weight: 700;
+}
+
+.small {
+  font-weight: 500;
+  color: #134e44;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  align-items: center;
+}
+
+.pay-btn {
+  background: #0077cc;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.pay-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  background: transparent;
+  border: 1px solid #d7dee6;
+  color: #1f2937;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.billing-note {
+  color: #6b7280;
+  margin-top: 14px;
+  font-size: 13px;
+}

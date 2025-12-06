@@ -1,0 +1,136 @@
+/* ============================
+   PLANS PAGE STYLES
+   ============================ */
+
+.plans-container {
+  padding: 20px;
+}
+
+.plans-title {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.plans-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.plan-card {
+  background: #ffffff;
+  border: 1px solid #e6e6e6;
+  border-radius: 12px;
+  padding: 20px;
+  transition: 0.2s ease-in-out;
+}
+
+.plan-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.plan-card.active {
+  border: 2px solid #007bff;
+  box-shadow: 0 0 10px rgba(0, 123, 255, 0.25);
+}
+
+.plan-name {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.plan-description {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.plan-price {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.plan-features {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 16px;
+}
+
+.plan-features li {
+  font-size: 14px;
+  padding: 4px 0;
+}
+
+.plan-btn {
+  width: 100%;
+  padding: 10px;
+  font-size: 15px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background-color: #007bff;
+  color: white;
+  transition: 0.2s;
+}
+
+.plan-btn:hover {
+  background-color: #005dc1;
+}
+
+.plan-btn.disabled {
+  background-color: #b0b0b0;
+  cursor: not-allowed;
+}
+
+/* Notification / validation / success / error styles */
+.notification {
+  margin: 12px 0;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+/* validation box */
+.validation-box {
+  background: #fff8e6;
+  border: 1px solid #ffeeba;
+  color: #856404;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.validation-code {
+  font-weight: 700;
+  background: #fff3cd;
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #856404;
+  border: 1px solid rgba(0,0,0,0.03);
+  min-width: 70px;
+  text-align: center;
+}
+
+/* success text (your provided style) */
+.success-text {
+  color: #27ae60;
+  background: rgba(39, 174, 96, 0.08);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  border: 1px solid rgba(39, 174, 96, 0.12);
+}
+
+/* error text */
+.error-text {
+  color: #a94442;
+  background: rgba(169, 68, 66, 0.08);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  border: 1px solid rgba(169, 68, 66, 0.12);
+}

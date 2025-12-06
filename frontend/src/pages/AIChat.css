@@ -1,0 +1,248 @@
+/* AIChat.css — scoped scroll for chat area; global page scrolling restored
+   - html/body overflow = auto so other pages (e.g., View Profile) can scroll
+   - Chat area scrolls vertically inside .ai-chat-area-noscroll
+   - Composer/input never overlaps; safe bottom offset included
+*/
+
+/* --- Root variables & reset --- */
+:root{
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --muted: #6b7280;
+  --primary: #0369a1;
+  --text: #0f1724;
+
+  /* safe bottom offset so composer appears above OS taskbar/dock */
+  --safe-bottom: 56px;
+}
+
+/* Restore normal page scrolling so other pages can scroll (View Profile) */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: auto;             /* allow global page scroll */
+  box-sizing: border-box;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: var(--bg);
+}
+
+/* Outer wrapper with safe padding; make chat layout self-contained */
+.ai-fullscreen-noscroll {
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  /* top/left/right padding 16px; bottom includes the safe-bottom variable */
+  padding: 16px 16px calc(16px + var(--safe-bottom));
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;    /* center main column horizontally */
+  align-items: stretch;
+  background: transparent;
+  overflow: hidden;           /* prevent AI wrapper itself from creating page scroll */
+}
+
+/* Main column — controls overall width and alignment with header/logout */
+.ai-main-noscroll {
+  width: 100%;
+  max-width: 100%;            /* match header width */
+  height: calc(100vh - 32px - var(--safe-bottom)); /* fit inside wrapper while reserving safe bottom */
+  margin: 0 auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+/* Header */
+.ai-main-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  gap: 12px;
+  box-sizing: border-box;
+}
+.ai-left { display:flex; flex-direction:column; gap:4px; }
+.ai-title { margin:0; font-size:20px; font-weight:700; color:var(--text); }
+.ai-sub { margin:0; font-size:13px; color:var(--muted); }
+.ai-right { display:flex; align-items:center; gap:12px; }
+.ai-user-info { color:#374151; font-size:13px; white-space:nowrap; max-width:280px; overflow:hidden; text-overflow:ellipsis; }
+
+/* Optional logout button */
+.ai-logout-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #e6e9ee;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* --- Chat area: SCROLLABLE vertically only inside this element --- */
+.ai-chat-area-noscroll {
+  background: var(--card-bg);
+  border: 1px solid #e6e9ee;
+  border-radius: 10px;
+  padding: 20px 20px 20px 20px;
+  box-shadow: 0 6px 20px rgba(2,6,23,0.04);
+  flex: 1 1 auto;            /* take remaining vertical space */
+  overflow-y: auto;          /* vertical scrolling here only */
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;               /* ensure it fits container width */
+  min-height: 0;             /* important for flex children so it can shrink properly */
+  /* reserve space at bottom so last message isn't hidden under the composer */
+  padding-bottom: 140px;     /* adjust if your composer height changes */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Placeholder when there are no messages */
+.ai-placeholder { color: #9ca3af; text-align:center; margin-top:16px; }
+
+/* Messages list — will grow but remain inside the chat area (and scroll there) */
+.messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Message row and bubbles */
+.message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.user-row { justify-content: flex-end; }
+.bot-row { justify-content: flex-start; }
+
+.bubble { white-space: pre-wrap; word-break: break-word; box-sizing: border-box; }
+.user-bubble {
+  background: linear-gradient(180deg,#0369a1,#075985);
+  color: #fff;
+  border-radius: 12px 12px 6px 12px;
+  padding: 12px 14px;
+  max-width: 72%;
+  box-shadow: 0 4px 14px rgba(3,105,161,0.08);
+}
+.bot-bubble {
+  background: #f3f4f6;
+  color: #111827;
+  border-radius: 12px 12px 12px 6px;
+  padding: 12px 14px;
+  max-width: 72%;
+  box-shadow: 0 1px 2px rgba(16,24,40,0.03);
+}
+.bubble-text { display:block; }
+.bubble-time { font-size:11px; color: rgba(0,0,0,0.45); margin-top:8px; text-align:right; }
+
+/* Bot avatar */
+.bot-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  background: #e5e7eb;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color: #374151;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Typing */
+.typing-row { display:flex; align-items:center; gap:10px; color:var(--muted); font-style:italic; }
+
+/* Upgrade message */
+.ai-upgrade-msg.boxed {
+  padding: 12px;
+  background: #fff7cc;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  color: #92400e;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* --- Composer (INPUT) placed AFTER chat area so it never overlaps */
+/* Composer is fixed height area at bottom of the AI column */
+.ai-composer-noscroll {
+  flex: 0 0 auto;            /* fixed in place, does not grow */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding-top: 6px;
+  padding-bottom: calc(6px + var(--safe-bottom)); /* ensure safe distance from OS taskbar */
+}
+
+/* Composer inner box: white, rounded, with shadow */
+.ai-composer-inner {
+  margin: 0;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #e6e9ee;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(2,6,23,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+/* Input field */
+.ai-input {
+  width: 100%;
+  min-height: 56px;
+  max-height: 180px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #dbe6f0;
+  resize: vertical;
+  font-size: 15px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* Controls (message count + buttons) */
+.ai-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+}
+.msg-count { font-size: 13px; color: var(--muted); }
+.controls-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; box-sizing: border-box; }
+
+/* Buttons */
+.btn { padding: 8px 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: 700; box-sizing: border-box; }
+.btn-clear { background: transparent; border: 1px solid #e6e9ee; color: #374151; }
+.btn-send { background: var(--primary); color: #fff; }
+.btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+/* Error */
+.ai-error { color: #b91c1c; font-size: 13px; box-sizing: border-box; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  :root { --safe-bottom: 72px; } /* mobile docks may be larger */
+  .ai-fullscreen-noscroll { padding: 12px 12px calc(12px + var(--safe-bottom)); }
+  .ai-main-noscroll { height: calc(100vh - 24px - var(--safe-bottom)); max-width: 100%; }
+  .user-bubble, .bot-bubble { max-width: 86%; }
+  .ai-input { min-height: 48px; }
+  .ai-user-info { max-width: 160px; }
+}
