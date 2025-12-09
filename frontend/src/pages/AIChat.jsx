@@ -1,3 +1,4 @@
+// frontend/src/pages/AIChat.jsx
 import React, { useState, useContext, useEffect } from "react";
 import axios from "axios";
 import { API_URL } from "../config/api";
@@ -5,8 +6,8 @@ import { UserContext } from "../context/UserContext";
 import "./AIChat.css";
 
 /**
- * AIChat component — scroll behavior removed, full-bleed layout (no left/right gaps).
- * All original networking/logic preserved.
+ * AIChat component — fullscreen layout (no auto-scroll).
+ * Now works with subscription-based AI gating from backend.
  */
 
 export default function AIChat() {
@@ -16,17 +17,23 @@ export default function AIChat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Removed auto-scroll effect and chatRef usage per request
+  // No auto-scroll
   useEffect(() => {
-    // intentionally left empty — no auto-scroll
+    // intentionally empty
   }, [messages, loading]);
 
   // Read canonical user (context preferred, fallback to localStorage)
-  const localUser = user || (() => {
-    try { return JSON.parse(localStorage.getItem("user") || "null"); } catch { return null; }
-  })();
+  const localUser =
+    user ||
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem("user") || "null");
+      } catch {
+        return null;
+      }
+    })();
 
-  // Determine AI permission from a few shapes
+  // Determine AI permission from subscription
   function detectCanUseAI(u) {
     if (!u) return false;
     const s = u.subscription || null;
@@ -48,18 +55,28 @@ export default function AIChat() {
     `${(API_URL || "").replace(/\/+$/, "")}/ai/free-chat/`,
   ];
 
-  // low-level POST caller
   async function callEndpoint(url, token, payload = { prompt: "" }) {
     try {
-      const headers = token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+      const headers = token
+        ? {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          }
+        : { "Content-Type": "application/json" };
       const res = await axios.post(url, payload, { headers, timeout: 30000 });
       return { ok: true, data: res.data, status: res.status, url };
     } catch (err) {
-      return { ok: false, error: err, status: err?.response?.status, url, response: err?.response };
+      return {
+        ok: false,
+        error: err,
+        status: err?.response?.status,
+        url,
+        response: err?.response,
+      };
     }
   }
 
-  // try to refresh profile from likely endpoints
+  // Try to refresh profile from likely endpoints
   async function refetchProfileOnce(token) {
     if (!token) return null;
     const profileCandidates = [
@@ -70,20 +87,28 @@ export default function AIChat() {
     ];
     for (const endpoint of profileCandidates) {
       try {
-        const r = await axios.get(endpoint, { headers: { Authorization: `Bearer ${token}` }, timeout: 7000 });
+        const r = await axios.get(endpoint, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 7000,
+        });
         if (r && r.data) {
-          try { setUser && setUser(r.data); localStorage.setItem("user", JSON.stringify(r.data)); } catch (e) {/* ignore */ }
+          try {
+            setUser && setUser(r.data);
+            localStorage.setItem("user", JSON.stringify(r.data));
+          } catch (e) {}
           return r.data;
         }
-      } catch (e) { /* try next */ }
+      } catch (e) {
+        // try next
+      }
     }
     return null;
   }
 
-  // tries endpoints, optionally refreshes profile if suspicion of stale permissions
   async function callAiWithRetries(promptText) {
     const token = localStorage.getItem("access");
-    if (!token) return { ok: false, error: new Error("Authentication required"), code: "NO_TOKEN" };
+    if (!token)
+      return { ok: false, error: new Error("Authentication required"), code: "NO_TOKEN" };
 
     const payload = { prompt: promptText };
     let lastFailure = null;
@@ -92,12 +117,11 @@ export default function AIChat() {
       const attempt = await callEndpoint(ep, token, payload);
       if (attempt.ok) return attempt;
       lastFailure = attempt;
-      // if auth error, short-circuit
+      // Auth error → stop
       if (attempt.status === 401) return attempt;
-      // continue trying on 404/5xx/network
     }
 
-    // If unsuccessful and user locally looked like they should have AI, refresh profile and retry once
+    // If 403/404 and locally looks like they should have AI, refresh profile and retry once
     if ((lastFailure?.status === 403 || lastFailure?.status === 404) && detectCanUseAI(localUser)) {
       const refreshed = await refetchProfileOnce(token);
       if (refreshed && detectCanUseAI(refreshed)) {
@@ -119,7 +143,7 @@ export default function AIChat() {
 
     setError(null);
     const userMsg = { role: "user", text, ts: new Date().toISOString() };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages((prev) => [...prev, userMsg]);
     setPrompt("");
     setLoading(true);
 
@@ -128,34 +152,62 @@ export default function AIChat() {
       if (!token) throw new Error("You must be logged in to use AI chat.");
 
       if (!canUseAI) {
-        // show short advisory (we still attempt to call so devs can surface backend responses)
-        setError("Your plan does not indicate AI access locally. Attempting call to backend (for testing).");
+        // Advisory: frontend thinks plan has no AI
+        setError(
+          "Your plan does not show AI access locally. If backend disagrees, you'll see a 403 or success below."
+        );
       }
 
       const result = await callAiWithRetries(text);
 
       if (!result || !result.ok) {
         let msg = "AI request failed.";
-        if (result?.status === 401) msg = "Authentication failed. Please log in again.";
-        else if (result?.status === 403) msg = "You don't have access to AI (403). Upgrade your plan.";
-        else if (result?.status === 404) msg = "AI endpoint not found (404). Check backend routes.";
-        else if (result?.error?.code === "ECONNABORTED") msg = "Request timed out.";
-        else if (result?.error?.message) msg = `Network error: ${result.error.message}`;
+
+        const codeFromBackend = result?.response?.data?.code;
+        const detailFromBackend = result?.response?.data?.detail;
+
+        if (codeFromBackend === "NO_AI_ACCESS") {
+          msg = detailFromBackend || "Your subscription does not include AI access.";
+        } else if (result?.status === 401) {
+          msg = "Authentication failed. Please log in again.";
+        } else if (result?.status === 403) {
+          msg = detailFromBackend || "You don't have access to AI (403). Upgrade your plan.";
+        } else if (result?.status === 404) {
+          msg = "AI endpoint not found (404). Check backend routes.";
+        } else if (result?.error?.code === "ECONNABORTED") {
+          msg = "Request timed out.";
+        } else if (result?.error?.message) {
+          msg = `Network error: ${result.error.message}`;
+        }
+
         setError(msg);
-        setMessages(prev => [...prev, { role: "assistant", text: `Error: ${msg}`, ts: new Date().toISOString() }]);
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", text: `Error: ${msg}`, ts: new Date().toISOString() },
+        ]);
         return;
       }
 
       const data = result.data || {};
-      const reply = data.response ?? data.result ?? data.message ?? (typeof data === "string" ? data : null);
+      const reply =
+        data.response ??
+        data.result ??
+        data.message ??
+        (typeof data === "string" ? data : null);
       const finalText = reply ?? JSON.stringify(data).slice(0, 800);
 
-      setMessages(prev => [...prev, { role: "assistant", text: finalText, ts: new Date().toISOString() }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: finalText, ts: new Date().toISOString() },
+      ]);
     } catch (err) {
       console.error("AI Chat Error:", err);
       const errMsg = err?.message || "Unknown error when calling AI";
       setError(errMsg);
-      setMessages(prev => [...prev, { role: "assistant", text: `Error: ${errMsg}`, ts: new Date().toISOString() }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: `Error: ${errMsg}`, ts: new Date().toISOString() },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -169,7 +221,10 @@ export default function AIChat() {
   }
 
   function renderBubble(m) {
-    const time = new Date(m.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const time = new Date(m.ts).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     if (m.role === "user") {
       return (
         <div className="message-row user-row">
@@ -194,25 +249,31 @@ export default function AIChat() {
     return <div className="system-msg">{m.text}</div>;
   }
 
-  // If local user lacks AI, show upgrade prompt but still allow test call UI (no scrolling)
+  // If local user lacks AI, show upgrade prompt (but still allow test send)
   if (!canUseAI) {
     return (
       <div className="ai-fullscreen-noscroll">
         <main className="ai-main-noscroll">
           <header className="ai-main-header">
             <h2 className="ai-title">AI Chat</h2>
-            <div className="ai-user-info">{localUser?.email ?? localUser?.username ?? "User"}</div>
+            <div className="ai-user-info">
+              {localUser?.email ?? localUser?.username ?? "User"}
+            </div>
           </header>
 
           <div className="ai-upgrade-msg boxed">
             AI access is not enabled for your current subscription.
             <br />
-            {localUser ? "Please upgrade to Enterprise to use AI chat (or use test send below)." : "Please log in first."}
+            {localUser
+              ? "Please upgrade to Enterprise (or a plan with AI) to use chat. You can still test the endpoint below."
+              : "Please log in first."}
           </div>
 
           <div className="ai-chat-area-noscroll">
             <div className="messages-list">
-              {messages.map((m, i) => (<div key={i}>{renderBubble(m)}</div>))}
+              {messages.map((m, i) => (
+                <div key={i}>{renderBubble(m)}</div>
+              ))}
               {loading && (
                 <div className="typing-row">
                   <div className="bot-avatar">AI</div>
@@ -237,8 +298,20 @@ export default function AIChat() {
             <div className="ai-controls">
               <div className="msg-count">{messages.length} messages</div>
               <div className="controls-right">
-                <button className="btn btn-clear" onClick={() => { setMessages([]); setError(null); }}>Clear</button>
-                <button className="btn btn-send" onClick={handleSend} disabled={loading || !prompt.trim()}>
+                <button
+                  className="btn btn-clear"
+                  onClick={() => {
+                    setMessages([]);
+                    setError(null);
+                  }}
+                >
+                  Clear
+                </button>
+                <button
+                  className="btn btn-send"
+                  onClick={handleSend}
+                  disabled={loading || !prompt.trim()}
+                >
                   {loading ? "Sending..." : "Send (test)"}
                 </button>
               </div>
@@ -249,24 +322,32 @@ export default function AIChat() {
     );
   }
 
-  // Normal allowed UI (fullscreen, no scroll)
+  // Normal allowed UI
   return (
     <div className="ai-fullscreen-noscroll">
       <main className="ai-main-noscroll">
         <header className="ai-main-header">
           <div className="ai-left">
             <h2 className="ai-title">AI Chat</h2>
-            <div className="ai-sub">Ask anything — messages are proxied to your backend AI endpoint.</div>
+            <div className="ai-sub">
+              Ask anything — your messages are proxied to the backend Gemini endpoint.
+            </div>
           </div>
           <div className="ai-right">
-            <div className="ai-user-info">{localUser?.email ?? localUser?.username ?? "User"}</div>
+            <div className="ai-user-info">
+              {localUser?.email ?? localUser?.username ?? "User"}
+            </div>
           </div>
         </header>
 
         <div className="ai-chat-area-noscroll">
-          {messages.length === 0 && <div className="ai-placeholder">Start the conversation...</div>}
+          {messages.length === 0 && (
+            <div className="ai-placeholder">Start the conversation...</div>
+          )}
           <div className="messages-list">
-            {messages.map((m, i) => (<div key={i}>{renderBubble(m)}</div>))}
+            {messages.map((m, i) => (
+              <div key={i}>{renderBubble(m)}</div>
+            ))}
             {loading && (
               <div className="typing-row">
                 <div className="bot-avatar">AI</div>
@@ -291,9 +372,21 @@ export default function AIChat() {
           <div className="ai-controls">
             <div className="msg-count">{messages.length} messages</div>
             <div className="controls-right">
-              <button className="btn btn-clear" onClick={() => { setMessages([]); setError(null); }}>Clear</button>
-              <button className="btn btn-send" onClick={handleSend} disabled={loading || !prompt.trim()}>
-                {loading ? 'Sending...' : 'Send'}
+              <button
+                className="btn btn-clear"
+                onClick={() => {
+                  setMessages([]);
+                  setError(null);
+                }}
+              >
+                Clear
+              </button>
+              <button
+                className="btn btn-send"
+                onClick={handleSend}
+                disabled={loading || !prompt.trim()}
+              >
+                {loading ? "Sending..." : "Send"}
               </button>
             </div>
           </div>
