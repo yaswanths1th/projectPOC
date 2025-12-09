@@ -22,6 +22,7 @@ from .views import (
 # Optional: keep a constants endpoint if you want it for debugging
 from .views_constants import ConstantsAPIView, SingleMessageAPIView
 from django.urls import path, include
+from .views import ProfileView
 urlpatterns = [
     # Auth
     path("login/", CustomTokenObtainPairView.as_view()),
@@ -58,7 +59,8 @@ urlpatterns = [
     path("send-user-credentials/", send_user_credentials),
     path("check-username/", views.check_username, name="check_username"),
     path("check-email/", views.check_email, name="check_email"),
-     path('api/permissions/', include('apps.accounts.urls_permissions')),  # <- new
+    path('api/permissions/', include('apps.accounts.urls_permissions')),  # <- new
+    path("auth/profile/", ProfileView.as_view(), name="auth-profile"),
     
     
 ]

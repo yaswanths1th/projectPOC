@@ -1,17 +1,17 @@
 // frontend/src/pages/BillingPage.jsx
 import React, { useState, useEffect, useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { subscribeToPlan } from "../api/plansApi";
+import { subscribeToPlan, fetchProfile } from "../api/plansApi";
 import { UserContext } from "../context/UserContext";
+import { API_URL } from "../config/api";
 import "./BillingPage.css";
 
 /**
  * BillingPage
  *
- * - Attempts to call subscribeToPlan(planSlug) which should call your backend.
- * - If backend returns a canonical user (res.data.user) it will be persisted.
- * - Otherwise, if backend returns a subscription (res.data.subscription) we merge it into stored user.
- * - Falls back to a local mock write only if network subscribe fails.
+ * Attempts to call subscribeToPlan(planSlug) which should call your backend.
+ * If backend returns a canonical user (res.data.user) it will be persisted.
+ * Otherwise, we attempt to fetch canonical profile and persist it.
  */
 
 function money(cents) {
@@ -41,7 +41,6 @@ export default function BillingPage() {
   const navigate = useNavigate();
   const { setUser } = useContext(UserContext);
 
-  // prefer location.state; fallback to query params
   const fromState = (location && location.state) || {};
   const q = readQueryParams(location.search || "");
 
@@ -56,7 +55,6 @@ export default function BillingPage() {
   const [success, setSuccess] = useState(null);
 
   useEffect(() => {
-    // clear messages when plan changes
     setError(null);
     setSuccess(null);
   }, [planSlug, priceCents]);
@@ -83,24 +81,20 @@ export default function BillingPage() {
     setSuccess(null);
 
     try {
-      // Simulate short network delay for UX
+      // short UX delay
       await new Promise((res) => setTimeout(res, 500));
 
-      // Try to call canonical subscribe API via subscribeToPlan
       let apiResponse = null;
       try {
         apiResponse = await subscribeToPlan(planSlug, {
-          // optionally include payment data if you have any
           payment_provider: null,
           payment_reference: null
         });
       } catch (apiErr) {
-        // swallow — we'll fallback to local mock write below
         console.warn("subscribeToPlan failed (will fallback to local write):", apiErr);
         apiResponse = null;
       }
 
-      // If API returned canonical user/subscription, persist that authoritative value
       if (apiResponse && apiResponse.data) {
         const serverUser = apiResponse.data.user || null;
         const serverSubscription = apiResponse.data.subscription || null;
@@ -112,24 +106,39 @@ export default function BillingPage() {
             console.warn("Failed to persist server user to localStorage:", e);
           }
           if (setUser) setUser(serverUser);
-        } else if (serverSubscription) {
-          try {
-            const existing = JSON.parse(localStorage.getItem("user") || "{}");
-            const merged = { ...(existing || {}), subscription: serverSubscription };
-            localStorage.setItem("user", JSON.stringify(merged));
-            if (setUser) setUser(merged);
-          } catch (e) {
-            console.warn("Failed to merge/persist server subscription:", e);
-          }
         } else {
-          // No usable data returned — fallback to optimistic local write
-          const existing = JSON.parse(localStorage.getItem("user") || "{}");
-          const updatedUser = { ...(existing || {}), subscription: { slug: planSlug, can_use_ai: planSlug === "enterprise" } };
-          try { localStorage.setItem("user", JSON.stringify(updatedUser)); } catch (e) {}
-          if (setUser) setUser(updatedUser);
+          // fetch canonical user now
+          try {
+            const profileRes = await fetchProfile();
+            if (profileRes && profileRes.data) {
+              localStorage.setItem("user", JSON.stringify(profileRes.data));
+              if (setUser) setUser(profileRes.data);
+            } else if (serverSubscription) {
+              const existing = JSON.parse(localStorage.getItem("user") || "{}");
+              const merged = { ...(existing || {}), subscription: serverSubscription };
+              localStorage.setItem("user", JSON.stringify(merged));
+              if (setUser) setUser(merged);
+            } else {
+              const existing = JSON.parse(localStorage.getItem("user") || "{}");
+              const updatedUser = { ...(existing || {}), subscription: { slug: planSlug, can_use_ai: planSlug === "enterprise" } };
+              localStorage.setItem("user", JSON.stringify(updatedUser));
+              if (setUser) setUser(updatedUser);
+            }
+          } catch (errFetch) {
+            console.warn("BillingPage: profile fetch failed:", errFetch);
+            // fallback optimistic
+            try {
+              const existing = JSON.parse(localStorage.getItem("user") || "{}");
+              const updatedUser = { ...(existing || {}), subscription: { slug: planSlug, can_use_ai: planSlug === "enterprise" } };
+              localStorage.setItem("user", JSON.stringify(updatedUser));
+              if (setUser) setUser(updatedUser);
+            } catch (e) {
+              console.warn("BillingPage fallback failed:", e);
+            }
+          }
         }
       } else {
-        // No API response — perform local mock write (as your previous behavior)
+        // no API response — optimistic local update
         try {
           const existing = JSON.parse(localStorage.getItem("user") || "{}");
           const updatedUser = {
@@ -143,14 +152,10 @@ export default function BillingPage() {
         }
       }
 
-      // Build success message and navigate back to Plans page with state
       const successMessage = `Payment recorded for ${planName}`;
       const amountText = money(priceCents);
-
-      // Set a short-lived success state (optional)
       setSuccess({ message: successMessage, amount: amountText, plan: planName });
 
-      // Navigate to plans — PlansPage will display the message from location.state
       navigate("/account/plans", {
         state: {
           paymentSuccess: {

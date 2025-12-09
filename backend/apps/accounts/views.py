@@ -24,9 +24,24 @@ from .serializers import (
 )
 from .constants import DEFAULT_MESSAGES
 
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .serializers import ProfileSerializer
+
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        serializer = ProfileSerializer(request.user)
+        return Response(serializer.data)
+    
+    
+    
 # Registration
 @api_view(['POST'])
 @permission_classes([AllowAny])

@@ -1,3 +1,4 @@
+// frontend/src/pages/ViewProfile.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./ViewProfilePage.css";
@@ -24,7 +25,20 @@ function ViewProfile() {
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     return `${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`;
   };
 
@@ -37,67 +51,43 @@ function ViewProfile() {
           ? `${API_URL}/api/auth/admin/users/${userId}/`
           : `${API_URL}/api/auth/profile/`;
 
-        // Fetch profile
         const userRes = await axios.get(userUrl, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const fetchedUser = userRes.data;
         setUser(fetchedUser);
 
-        // Determine plan-based permissions:
-        // 1) Prefer subscription flags from fetched user (user.subscription)
-        // 2) Else use localStorage storedUser.subscription
-        // 3) Else try to fetch plans list and match on slug
+        // PLAN FLAGS:
+        // 1) prefer subscription on fetchedUser
+        // 2) fallback to local stored user
         let editFlag = false;
         let passFlag = false;
 
         if (fetchedUser?.subscription) {
-          // if API returns subscription with the flags
           editFlag = !!fetchedUser.subscription.can_edit_profile;
           passFlag = !!fetchedUser.subscription.can_change_password;
         } else if (storedUser?.subscription) {
           editFlag = !!storedUser.subscription.can_edit_profile;
           passFlag = !!storedUser.subscription.can_change_password;
-        } else {
-          // fallback: try fetching plans list and infer from slug if present
-          const slug = (fetchedUser?.subscription?.slug) || (storedUser?.subscription?.slug) || null;
-          if (slug) {
-            try {
-              const plansRes = await axios.get(`${API_URL}/api/plans/`);
-              const plans = Array.isArray(plansRes.data) ? plansRes.data : [];
-              const matched = plans.find(p => p.slug === slug);
-              if (matched) {
-                editFlag = !!matched.can_edit_profile;
-                passFlag = !!matched.can_change_password;
-              }
-            } catch (e) {
-              // Ignore plan fetch failures (we'll keep defaults)
-              console.warn("Failed to fetch plans to infer permissions:", e);
-            }
-          }
         }
 
         setCanEditProfile(editFlag);
         setCanChangePassword(passFlag);
 
-        // Address fetch when viewing own profile
         if (!isViewingOtherUser) {
-          const addrRes = await axios.get(
-            `${API_URL}/api/addresses/`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+          const addrRes = await axios.get(`${API_URL}/api/addresses/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           if (Array.isArray(addrRes.data) && addrRes.data.length > 0) {
             setAddress(addrRes.data[0]);
           }
         }
 
-        // load departments & roles (these appear to be public in your current code)
         const deptRes = await axios.get(`${API_URL}/api/auth/departments/`);
         const rolesRes = await axios.get(`${API_URL}/api/auth/roles/`);
 
         setDepartments(deptRes.data);
         setRoles(rolesRes.data);
-
       } catch (err) {
         console.error("Error fetching profile:", err);
       }
@@ -132,19 +122,20 @@ function ViewProfile() {
     <div className="view-profile-page">
       <div className="view-profile-header">
         <h2>
-          {isViewingOtherUser ? `User Profile: ${user.username}` : "Your Profile"}
+          {isViewingOtherUser
+            ? `User Profile: ${user.username}`
+            : "Your Profile"}
         </h2>
 
         <div className="header-actions">
-          {/* Only show edit/change password for own profile AND if plan allows OR if admin */}
           {!isViewingOtherUser && (
             <>
-              { (isAdminLoggedIn || canEditProfile) && (
+              {(isAdminLoggedIn || canEditProfile) && (
                 <button className="edit-btn" onClick={handleEdit}>
                   Edit Details
                 </button>
               )}
-              { (isAdminLoggedIn || canChangePassword) && (
+              {(isAdminLoggedIn || canChangePassword) && (
                 <button className="pass-btn" onClick={handleChangePassword}>
                   Change Password
                 </button>

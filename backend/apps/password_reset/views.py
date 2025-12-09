@@ -7,9 +7,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from datetime import timedelta
 import random
+import logging
 
 from .models import OTPCode
 from apps.accounts.models import User
+
+logger = logging.getLogger(__name__)
 
 
 def generate_otp():
@@ -42,8 +45,10 @@ def send_otp_view(request):
             [email],
             fail_silently=False,
         )
-    except Exception:
-        return Response({"code": "EA010"}, status=500)  # Email not sent
+    except Exception as e:
+        logger.error(f"Email sending failed: {str(e)}")
+        print(f"❌ Email Error: {str(e)}")
+        return Response({"code": "EA010", "error": str(e)}, status=500)  # Email not sent
 
     return Response({"code": "IF001"}, status=200)  # OTP sent successfully
 

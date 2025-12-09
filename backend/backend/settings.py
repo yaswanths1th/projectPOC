@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "apps.subscriptions",
 ]
 
+
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",  # ✅ must be first
     "django.middleware.security.SecurityMiddleware",
@@ -130,17 +131,18 @@ TEMPLATES = [
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-# ✅ EMAIL CONFIGURATION — No SMTP needed (prints to console)
-EMAIL_BACKEND = os.getenv("DJANGO_EMAIL_BACKEND","django.core.mail.backends.console.EmailBackend")
 
+# ✅ EMAIL CONFIGURATION — REAL EMAIL (SMTP)
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
-EMAIL_HOST_USER = "janamahi2010@gmail.com"      # ✅ change to actual sender email
-EMAIL_HOST_PASSWORD = "zeex topo acdn zsjq"    # ✅ Gmail App password
 EMAIL_USE_TLS = True
 
-DEFAULT_FROM_EMAIL = "janamahi2010@gmail.com"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 
-OTP_EXPIRY_MINUTES = 5
-#CORS_ALLOW_ALL_ORIGINS = True
-HF_API_TOKEN = os.getenv("HF_API_TOKEN")
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+
+
+
