@@ -12,15 +12,24 @@ function ViewProfile() {
   const [roles, setRoles] = useState([]);
   const [canEditProfile, setCanEditProfile] = useState(false);
   const [canChangePassword, setCanChangePassword] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const token = localStorage.getItem("access");
-  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-
   const navigate = useNavigate();
   const { userId } = useParams();
 
-  const isAdminLoggedIn = storedUser?.is_admin;
   const isViewingOtherUser = !!userId;
+
+  // compute admin flag from stored user; NOT in deps
+  const isAdminLoggedIn = (() => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      return !!storedUser?.is_admin;
+    } catch {
+      return false;
+    }
+  })();
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
@@ -43,23 +52,48 @@ function ViewProfile() {
   };
 
   useEffect(() => {
-    if (!token) return navigate("/login");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setErrorMsg("");
 
     const fetchData = async () => {
       try {
+        // 1) read storedUser once here
+        let storedUser;
+        try {
+          storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+        } catch {
+          storedUser = {};
+        }
+
+        // 2) fetch user (self or other)
         const userUrl = isViewingOtherUser
           ? `${API_URL}/api/auth/admin/users/${userId}/`
           : `${API_URL}/api/auth/profile/`;
 
-        const userRes = await axios.get(userUrl, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const fetchedUser = userRes.data;
-        setUser(fetchedUser);
+        let fetchedUser = null;
+        try {
+          const userRes = await axios.get(userUrl, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (cancelled) return;
+          fetchedUser = userRes.data;
+          setUser(fetchedUser);
+        } catch (err) {
+          console.error("[ViewProfile] user fetch failed:", err);
+          if (!cancelled) {
+            setErrorMsg("Failed to load profile details.");
+            setLoading(false);
+          }
+          return; // core request failed; stop further work
+        }
 
-        // PLAN FLAGS:
-        // 1) prefer subscription on fetchedUser
-        // 2) fallback to local stored user
+        // 3) subscription / plan flags
         let editFlag = false;
         let passFlag = false;
 
@@ -74,27 +108,64 @@ function ViewProfile() {
         setCanEditProfile(editFlag);
         setCanChangePassword(passFlag);
 
+        // 4) address (only for self) – ignore errors
         if (!isViewingOtherUser) {
-          const addrRes = await axios.get(`${API_URL}/api/addresses/`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (Array.isArray(addrRes.data) && addrRes.data.length > 0) {
-            setAddress(addrRes.data[0]);
+          try {
+            const addrRes = await axios.get(`${API_URL}/api/addresses/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!cancelled) {
+              const arr = Array.isArray(addrRes.data) ? addrRes.data : [];
+              if (arr.length > 0) setAddress(arr[0]);
+            }
+          } catch (err) {
+            console.error("[ViewProfile] address fetch failed:", err);
+            // don't set global error, just skip address
           }
         }
 
-        const deptRes = await axios.get(`${API_URL}/api/auth/departments/`);
-        const rolesRes = await axios.get(`${API_URL}/api/auth/roles/`);
+        // 5) departments – with auth header
+        try {
+          const deptRes = await axios.get(`${API_URL}/api/auth/departments/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!cancelled) {
+            setDepartments(deptRes.data || []);
+          }
+        } catch (err) {
+          console.error("[ViewProfile] departments fetch failed:", err);
+        }
 
-        setDepartments(deptRes.data);
-        setRoles(rolesRes.data);
+        // 6) roles – with auth header
+        try {
+          const rolesRes = await axios.get(`${API_URL}/api/auth/roles/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!cancelled) {
+            setRoles(rolesRes.data || []);
+          }
+        } catch (err) {
+          console.error("[ViewProfile] roles fetch failed:", err);
+        }
+
+        if (!cancelled) {
+          setLoading(false);
+        }
       } catch (err) {
-        console.error("Error fetching profile:", err);
+        console.error("[ViewProfile] unexpected error:", err);
+        if (!cancelled) {
+          setErrorMsg("Something went wrong while loading profile.");
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
-  }, [token, navigate, isViewingOtherUser, userId, storedUser]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, navigate, isViewingOtherUser, userId]);
 
   const getDepartmentName = () => {
     const dept = departments.find((d) => d.id === user.department);
@@ -118,8 +189,16 @@ function ViewProfile() {
 
   const handleBackToDashboard = () => navigate("/admin/dashboard");
 
+  if (!token) {
+    return null; // already redirected in effect
+  }
+
   return (
     <div className="view-profile-page">
+      {/* Simple loading & error banners */}
+      {loading && <p className="vp-loading">Loading profile...</p>}
+      {!loading && errorMsg && <p className="vp-error">{errorMsg}</p>}
+
       <div className="view-profile-header">
         <h2>
           {isViewingOtherUser

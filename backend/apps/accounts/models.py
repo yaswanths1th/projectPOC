@@ -94,3 +94,9 @@ class UserValidation(models.Model):
 
     def __str__(self):
         return f"{self.validation_code} - {self.validation_message}"
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    ai_message_limit = models.IntegerField(default=20)  # admin sets: 5 / 20 / 50 / etc.
+    # optional: track how many they used
+    ai_messages_used = models.IntegerField(default=0)

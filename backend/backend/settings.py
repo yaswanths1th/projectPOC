@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "apps.viewprofile",
     "apps.change_password",
     "apps.subscriptions",
+    "apps.ai_chat",
 ]
 
 

@@ -166,3 +166,60 @@
     justify-content: center;
   }
 }
+/* Top bar */
+.user-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: #003691; /* Evolvix blue */
+  color: #ffffff;
+}
+
+/* Left side: hamburger + logo */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Logo group */
+.header-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-logo {
+  height: 34px;          /* adjust size if needed */
+  width: auto;
+}
+
+.header-logo-text {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* Right side: welcome + logout */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Existing button can keep your old styles, add if missing: */
+.header-menu-btn {
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+/* Responsive: hide menu button on large screens if you want */
+@media (min-width: 768px) {
+  .header-menu-btn {
+    display: none;
+  }
+}

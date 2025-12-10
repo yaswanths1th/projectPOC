@@ -7,11 +7,12 @@ import {
   FiLogOut,
   FiCpu,
   FiPackage,
-  FiMenu,    // 🔹 for mobile hamburger
+  FiMenu, // 🔹 for mobile hamburger
 } from "react-icons/fi";
 
 import "./UserLayout.css";
 import { UserContext } from "../context/UserContext";
+import logo from "../assets/evolvix-logo-full.png";
 
 export default function UserLayout() {
   const navigate = useNavigate();
@@ -85,22 +86,31 @@ export default function UserLayout() {
       {/* CONTENT AREA */}
       <main className="user-content">
         <header className="user-header">
-          {/* Hamburger visible only on mobile via CSS */}
-          <button
-            className="header-menu-btn"
-            onClick={toggleSidebar}
-            aria-label="Toggle menu"
-          >
-            <FiMenu size={22} />
-          </button>
+          <div className="header-left">
+            {/* Hamburger visible only on mobile via CSS */}
+            <button
+              className="header-menu-btn"
+              onClick={toggleSidebar}
+              aria-label="Toggle menu"
+            >
+              <FiMenu size={22} />
+            </button>
 
-          <span className="header-user">
-            Welcome, {storedUser?.username || "User"}
-          </span>
+            <div className="header-logo-wrap">
+              <img src={logo} alt="Evolvix logo" className="header-logo" />
+              <span className="header-logo-text">EVOLVIX</span>
+            </div>
+          </div>
 
-          <button className="header-logout-btn" onClick={handleLogout}>
-            <FiLogOut size={18} /> Logout
-          </button>
+          <div className="header-right">
+            <span className="header-user">
+              Welcome, {storedUser?.username || "User"}
+            </span>
+
+            <button className="header-logout-btn" onClick={handleLogout}>
+              <FiLogOut size={18} /> Logout
+            </button>
+          </div>
         </header>
 
         <div className="user-page-container">
