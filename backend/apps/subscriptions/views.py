@@ -16,6 +16,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from .models import SubscriptionPlan, UserSubscription, get_features_for_plan
 from .serializers import SubscriptionPlanSerializer, UserSubscriptionSerializer
+from .serializers import PlanSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -369,3 +370,11 @@ def ai_free_chat(request):
         )
 
     return Response({"response": reply}, status=status.HTTP_200_OK)
+class PublicPlanListView(generics.ListAPIView):
+    """
+    Public endpoint: list all active subscription plans.
+    No authentication required.
+    """
+    queryset = SubscriptionPlan.objects.filter(is_active=True)
+    serializer_class = PlanSerializer
+    permission_classes = [permissions.AllowAny]

@@ -18,7 +18,8 @@ function loadUserFromStorage() {
   try {
     const raw = localStorage.getItem("user");
     return raw ? JSON.parse(raw) : null;
-  } catch {
+  } catch (e) {
+    console.warn("[UserContext] failed to parse user from storage:", e);
     return null;
   }
 }
@@ -42,23 +43,30 @@ export default function UserProvider({ children }) {
       localStorage.removeItem("access");
       localStorage.removeItem("refresh");
       localStorage.removeItem("user");
-    } catch {}
+    } catch (e) {
+      console.warn("[UserContext] error clearing storage:", e);
+    }
     setUserState(null);
   }, []);
 
   const setUser = useCallback((u) => {
     setUserState(u);
-    if (u) saveUserToStorage(u);
-    else {
+    if (u) {
+      saveUserToStorage(u);
+    } else {
       try {
         localStorage.removeItem("user");
-      } catch {}
+      } catch (e) {
+        console.warn("[UserContext] error removing user from storage:", e);
+      }
     }
   }, []);
 
   const fetchCanonicalUser = useCallback(
     async ({ force = false } = {}) => {
-      if (VERBOSE) console.log("[UserContext] fetchCanonicalUser, force =", force);
+      if (VERBOSE)
+        console.log("[UserContext] fetchCanonicalUser, force =", force);
+
       setLoading(true);
 
       const token = localStorage.getItem("access");
@@ -82,9 +90,9 @@ export default function UserProvider({ children }) {
           console.log("[UserContext] profile fetched:", res.status, profile);
         }
 
-        // 🔥 TRUST BACKEND SHAPE EXACTLY
-        // If backend sends `subscription`, we keep it as-is.
-        // If it later adds `active_subscription`, still fine, we don't override.
+        // ✅ TRUST BACKEND SHAPE EXACTLY
+        // Whatever the backend sends (including subscription/features),
+        // we keep as-is and persist.
         setUser(profile);
 
         setLoading(false);
@@ -101,17 +109,20 @@ export default function UserProvider({ children }) {
           return null;
         }
 
+        // Fallback to last stored user if any
         const stored = loadUserFromStorage();
         if (stored) {
-          if (VERBOSE)
+          if (VERBOSE) {
             console.log(
               "[UserContext] using stored user as fallback after error",
               stored
             );
+          }
           setUserState(stored);
         } else {
           setUserState(null);
         }
+
         setLoading(false);
         return stored;
       }
@@ -124,18 +135,23 @@ export default function UserProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // expose for debug / manual refresh
+  // Expose for debug / manual refresh
   useEffect(() => {
     try {
       window.__refreshUser = async () => {
         if (VERBOSE) console.log("[UserContext] manual refresh called");
         return await fetchCanonicalUser({ force: true });
       };
-    } catch {}
+    } catch (e) {
+      console.warn("[UserContext] failed to attach __refreshUser:", e);
+    }
+
     return () => {
       try {
         delete window.__refreshUser;
-      } catch {}
+      } catch (e) {
+        // ignore
+      }
     };
   }, [fetchCanonicalUser]);
 

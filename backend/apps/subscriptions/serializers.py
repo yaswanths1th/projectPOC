@@ -26,6 +26,12 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
         return get_features_for_plan(obj.slug)
 
 
+# 🔹 Alias to keep old imports working (PlanSerializer)
+class PlanSerializer(SubscriptionPlanSerializer):
+    class Meta(SubscriptionPlanSerializer.Meta):
+        pass
+
+
 class UserSubscriptionSerializer(serializers.ModelSerializer):
     plan = SubscriptionPlanSerializer(read_only=True)
     features = serializers.SerializerMethodField()

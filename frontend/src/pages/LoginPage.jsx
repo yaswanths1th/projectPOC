@@ -13,23 +13,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
-  const { setUser } = useContext(UserContext);
+  const { setUser } = useContext(UserContext) || {};
   const navigate = useNavigate();
 
-  // helper to try multiple URLs for subscription/profile (robustness)
+  // Generic helper to try multiple URLs (used only for profile now)
   async function tryFetchCandidates(candidates = [], init = {}) {
     for (const url of candidates) {
       try {
         const r = await fetch(url, init);
         const text = await r.text().catch(() => "");
         let json = null;
-        try { json = text ? JSON.parse(text) : null; } catch { json = null; }
-        if (VERBOSE) console.log("tryFetchCandidates:", url, r.status, json ?? text);
-        // return both status and parsed json (or raw text)
+        try {
+          json = text ? JSON.parse(text) : null;
+        } catch {
+          json = null;
+        }
+        if (VERBOSE)
+          console.log("tryFetchCandidates:", url, r.status, json ?? text);
         return { ok: r.ok, status: r.status, data: json, raw: text, url };
       } catch (err) {
-        if (VERBOSE) console.warn("tryFetchCandidates failed for", url, err);
-        // continue to next candidate
+        if (VERBOSE)
+          console.warn("tryFetchCandidates failed for", url, err);
+        // try next candidate
       }
     }
     return { ok: false, status: null, data: null, raw: null, url: null };
@@ -40,6 +45,7 @@ export default function LoginPage() {
     setMessage("");
 
     try {
+      // 1️⃣ Login to get tokens
       const loginRes = await fetch(`${API_URL}/api/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -47,7 +53,11 @@ export default function LoginPage() {
       });
 
       const loginJson = await (async () => {
-        try { return await loginRes.json(); } catch { return {}; }
+        try {
+          return await loginRes.json();
+        } catch {
+          return {};
+        }
       })();
 
       if (!loginRes.ok || !loginJson.access) {
@@ -59,25 +69,32 @@ export default function LoginPage() {
         return;
       }
 
-      // Save tokens immediately
+      // 2️⃣ Save tokens immediately
       localStorage.setItem("access", loginJson.access);
       if (loginJson.refresh) localStorage.setItem("refresh", loginJson.refresh);
 
-      // Build headers for subsequent calls
-      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${loginJson.access}` };
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${loginJson.access}`,
+      };
 
-      // Try to fetch canonical profile from common candidate endpoints
+      // 3️⃣ Fetch canonical PROFILE from backend
+      //    This contains the real subscription (with can_use_ai TRUE for enterprise)
       const profileCandidates = [
         `${API_URL}/api/auth/profile/`,
         `${API_URL}/api/profile/`,
         `${API_URL}/profile/`,
         `${API_URL}/accounts/profile/`,
       ];
-      const profileResult = await tryFetchCandidates(profileCandidates, { method: "GET", headers });
+      const profileResult = await tryFetchCandidates(profileCandidates, {
+        method: "GET",
+        headers,
+      });
 
       let profile = profileResult.data || null;
+
       if (!profile) {
-        // fallback to minimal profile from login response
+        // Fallback minimal profile from login response (if server didn’t return profile)
         profile = {
           username: loginJson.username || username,
           email: loginJson.email || "",
@@ -88,80 +105,66 @@ export default function LoginPage() {
         };
       }
 
-      // Try to fetch subscription from candidate endpoints (some backends return 204)
-      const subscriptionCandidates = [
-        `${API_URL}/api/subscription/`,
-        `${API_URL}/subscription/`,
-        `${API_URL}/api/subscriptions/current/`,
-        `${API_URL}/api/subscription/subscription/`,
-      ];
-      const subResult = await tryFetchCandidates(subscriptionCandidates, { method: "GET", headers });
-
-      let subscription = null;
-      if (subResult.status === 204) {
-        subscription = { slug: "free", can_use_ai: false };
-      } else if (subResult.data) {
-        // backend may return either {slug:..., can_use_ai:...} or full detail
-        subscription = subResult.data;
-      } else {
-        // Last attempt: maybe profile contained subscription
-        subscription = profile.subscription || null;
+      // ⚠️ IMPORTANT:
+      // Do NOT override subscription coming from profile.
+      // Only attach a default if backend did not send subscription at all.
+      if (!profile.subscription) {
+        profile.subscription = { slug: "free", can_use_ai: false };
       }
 
-      // Normalise subscription object: we only need slug and can_use_ai for UI
-      if (subscription) {
-        if (typeof subscription === "string") {
-          subscription = { slug: subscription, can_use_ai: false };
-        } else if (subscription.slug) {
-          // already fine
-        } else {
-          // try to derive slug from possible shapes
-          if (subscription.plan && subscription.plan.slug) {
-            subscription = { slug: subscription.plan.slug, can_use_ai: !!subscription.plan.can_use_ai };
-          } else if (subscription.name && typeof subscription.name === "string") {
-            subscription = { slug: subscription.name.toLowerCase(), can_use_ai: !!subscription.can_use_ai };
-          } else {
-            subscription = { slug: "free", can_use_ai: false };
-          }
-        }
-      } else {
-        subscription = { slug: "free", can_use_ai: false };
-      }
-
-      // Attach canonical subscription to profile
-      profile.subscription = subscription;
-
-      // Persist canonical user exactly once
+      // 4️⃣ Persist canonical user exactly once
       try {
         localStorage.setItem("user", JSON.stringify(profile));
       } catch (e) {
         console.warn("Failed to write user to localStorage:", e);
       }
 
-      // Update context so UI re-renders
+      // 5️⃣ Update context so ALL pages (Dashboard, AIChat, etc.) see the same user
       if (setUser) setUser(profile);
+
+      // Optional: ask UserContext to re-fetch if available
+      try {
+        if (typeof window !== "undefined" && window.__refreshUser) {
+          window.__refreshUser().catch((err) =>
+            console.warn("[Login] __refreshUser error:", err)
+          );
+        }
+      } catch {}
 
       if (VERBOSE) {
         console.log("[Login] loginResponse:", loginJson);
-        console.log("[Login] profile fetched from:", profileResult.url, profileResult.status, profileResult.data);
-        console.log("[Login] subscription fetched from:", subResult.url, subResult.status, subResult.data);
+        console.log(
+          "[Login] profile fetched from:",
+          profileResult.url,
+          profileResult.status,
+          profileResult.data
+        );
         console.log("[Login] final persisted profile:", profile);
       }
 
       setMessage("Login successful");
 
-      // Route user as before
+      // 6️⃣ Route user as before (admin vs user, address check)
       const roleId = Number(profile.role_id || loginJson.role_id || 0);
+
       setTimeout(async () => {
         if (!isNaN(roleId) && roleId !== 2) {
+          // not "User" role → admin dashboard
           navigate("/admin/dashboard", { replace: true });
           return;
         }
+
         try {
-          const addrRes = await fetch(`${API_URL}/api/addresses/check/`, { method: "GET", headers });
+          const addrRes = await fetch(`${API_URL}/api/addresses/check/`, {
+            method: "GET",
+            headers,
+          });
           const addrData = await addrRes.json().catch(() => ({}));
-          if (addrRes.ok && addrData.has_address) navigate("/dashboard", { replace: true });
-          else navigate("/addresses", { replace: true });
+          if (addrRes.ok && addrData.has_address) {
+            navigate("/dashboard", { replace: true });
+          } else {
+            navigate("/addresses", { replace: true });
+          }
         } catch {
           navigate("/addresses", { replace: true });
         }
@@ -178,21 +181,54 @@ export default function LoginPage() {
         <h2>Login</h2>
 
         <form onSubmit={handleLogin} className="login-form" noValidate>
-          <input className="login-input" type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <input
+            className="login-input"
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
 
           <div className="password-wrapper">
-            <input className="login-input" type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            <span className="password-toggle" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <FiEyeOff /> : <FiEye />}</span>
+            <input
+              className="login-input"
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <span
+              className="password-toggle"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <FiEyeOff /> : <FiEye />}
+            </span>
           </div>
 
-          {message && <p className={`login-message ${message === "Login successful" ? "success-text" : "error-text"}`}>{message}</p>}
+          {message && (
+            <p
+              className={`login-message ${
+                message === "Login successful" ? "success-text" : "error-text"
+              }`}
+            >
+              {message}
+            </p>
+          )}
 
-          <button className="login-button" type="submit">Login</button>
+          <button className="login-button" type="submit">
+            Login
+          </button>
         </form>
 
         <div className="login-links">
-          <p><Link to="/forgot-password">Forgot password?</Link></p>
-          <p>Don’t have an account? <Link to="/register">Register</Link></p>
+          <p>
+            <Link to="/forgot-password">Forgot password?</Link>
+          </p>
+          <p>
+            Don’t have an account? <Link to="/register">Register</Link>
+          </p>
         </div>
       </div>
     </div>

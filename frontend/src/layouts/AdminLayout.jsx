@@ -6,6 +6,7 @@ import {
   BarChart2,
   Settings,
   LogOut,
+  Menu,          // 🔹 hamburger icon
 } from "lucide-react";
 import "./AdminLayout.css";
 
@@ -17,6 +18,7 @@ export default function AdminLayout() {
   const [permissions, setPermissions] = useState([]);
   const [initial, setInitial] = useState("A");
   const [avatarColor, setAvatarColor] = useState("#0b2349");
+  const [sidebarOpen, setSidebarOpen] = useState(false); // 🔹 for mobile drawer
 
   useEffect(() => {
     const token = localStorage.getItem("access");
@@ -25,26 +27,18 @@ export default function AdminLayout() {
       return;
     }
 
-    // 🔥 READ USER FROM LOCALSTORAGE INSTEAD OF API
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
-
     console.log("USER FROM STORAGE:", userData);
 
-    // SET NAME
     const name =
       userData.username ||
       `${userData.first_name || ""} ${userData.last_name || ""}`.trim() ||
       "Admin";
 
     setAdminName(name);
-
-    // SET PANEL NAME FROM role_name
     setPanelName(userData.role_name || "Admin");
-
-    // SET PERMISSIONS
     setPermissions(userData.permissions || []);
 
-    // Avatar setup
     const first = name.charAt(0).toUpperCase();
     setInitial(first);
     setAvatarColor(generateColor(first));
@@ -73,61 +67,84 @@ export default function AdminLayout() {
     navigate("/login");
   };
 
+  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="admin-layout">
-      <aside className="admin-sidebar">
+      {/* 🔹 Backdrop for mobile */}
+      <div
+        className={`sidebar-backdrop ${sidebarOpen ? "show" : ""}`}
+        onClick={closeSidebar}
+      />
 
-        {/* 🔥 DYNAMIC PANEL NAME */}
+      {/* 🔹 Sidebar */}
+      <aside className={`admin-sidebar ${sidebarOpen ? "open" : ""}`}>
         <h2 className="sidebar-title">{panelName} Panel</h2>
 
         <nav className="sidebar-nav">
-          {/* ALWAYS VISIBLE */}
           <NavLink
             to="/admin/dashboard"
-            className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
+            className={({ isActive }) =>
+              isActive ? "nav-link active" : "nav-link"
+            }
+            onClick={closeSidebar}
           >
             <LayoutDashboard size={18} /> Dashboard
           </NavLink>
 
-          {/* MANAGE USERS */}
           {has("view_manage_user") && (
-  <NavLink
-    to="/admin/users"
-    className={({ isActive }) =>
-      isActive ? "nav-link active" : "nav-link"
-    }
-  >
-    <Users size={18} /> Manage Users
-  </NavLink>
-)}
+            <NavLink
+              to="/admin/users"
+              className={({ isActive }) =>
+                isActive ? "nav-link active" : "nav-link"
+              }
+              onClick={closeSidebar}
+            >
+              <Users size={18} /> Manage Users
+            </NavLink>
+          )}
 
-
-          {/* REPORTS */}
-          {has("view_reports") ? (
+          {has("view_reports") && (
             <NavLink
               to="/admin/reports"
-              className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
+              className={({ isActive }) =>
+                isActive ? "nav-link active" : "nav-link"
+              }
+              onClick={closeSidebar}
             >
               <BarChart2 size={18} /> Reports
             </NavLink>
-          ) : null}
+          )}
 
-          {/* SETTINGS */}
-          {has("view_settings") ||
-          has("manage_roles") ||
-          has("manage_departments") ? (
+          {(has("view_settings") ||
+            has("manage_roles") ||
+            has("manage_departments")) && (
             <NavLink
               to="/admin/settings"
-              className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
+              className={({ isActive }) =>
+                isActive ? "nav-link active" : "nav-link"
+              }
+              onClick={closeSidebar}
             >
               <Settings size={18} /> Settings
             </NavLink>
-          ) : null}
+          )}
         </nav>
       </aside>
 
+      {/* 🔹 Main wrapper */}
       <div className="admin-main-wrapper">
         <header className="admin-header">
+          {/* Hamburger button (visible on mobile via CSS) */}
+          <button
+            className="header-menu-btn"
+            onClick={toggleSidebar}
+            aria-label="Toggle menu"
+          >
+            <Menu size={22} />
+          </button>
+
           <span className="header-title">Welcome, {adminName}</span>
 
           <div

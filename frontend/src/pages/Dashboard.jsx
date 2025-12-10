@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
 import { API_URL } from "../config/api";
 
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const token = localStorage.getItem("access");

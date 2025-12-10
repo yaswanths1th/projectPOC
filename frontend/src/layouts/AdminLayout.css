@@ -1,5 +1,5 @@
 /* ==============================
-   AdminLayout.css — FINAL VERSION
+   AdminLayout.css — responsive
    ============================== */
 
 .admin-layout {
@@ -10,8 +10,12 @@
   background: #f4f6fa;
 }
 
+/* 🔹 Backdrop for mobile drawer */
+.sidebar-backdrop {
+  display: none;
+}
 
-/* ✅ SIDEBAR */
+/* 🔹 Sidebar */
 .admin-sidebar {
   position: fixed;
   left: 0;
@@ -24,16 +28,17 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  z-index: 1200;
 }
 
-/* ✅ Sidebar Title */
+/* Sidebar Title */
 .sidebar-title {
   font-size: 22px;
   font-weight: 700;
   margin: 0 0 6px;
 }
 
-/* ✅ Sidebar Nav Links */
+/* Sidebar Nav Links */
 .sidebar-nav {
   list-style: none;
   padding: 0;
@@ -62,32 +67,7 @@
   color: #fff;
 }
 
-
-
-
-.nav-link {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  color: #cfd8e3;
-  font-weight: 600;
-  text-decoration: none;
-  transition: 0.3s ease;
-}
-
-.nav-link:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-}
-
-.nav-link.active {
-  background: #1c3e72;
-  color: #fff;
-}
-
-/* ✅ Page Wrapper */
+/* 🔹 Main wrapper pushed right on desktop */
 .admin-main-wrapper {
   flex: 1;
   display: flex;
@@ -98,7 +78,7 @@
   margin-left: 240px;
 }
 
-/* ✅ Header like UserLayout */
+/* Header */
 .admin-header {
   height: 80px;
   background: white;
@@ -112,7 +92,7 @@
   left: 240px;
   right: 0;
   z-index: 1100;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
   box-sizing: border-box;
@@ -124,7 +104,16 @@
   color: #2f3a4d;
 }
 
-/* ✅ Profile Box (Avatar + Name + Logout) */
+/* Hamburger button – hidden on desktop */
+.header-menu-btn {
+  display: none;
+  border: none;
+  background: transparent;
+  margin-right: 14px;
+  cursor: pointer;
+}
+
+/* Profile Box (Avatar + Name + Logout) */
 .profile-box {
   display: flex;
   align-items: center;
@@ -132,7 +121,7 @@
   padding: 8px 16px;
   border-radius: 12px;
   background: #ffffff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   transition: 0.25s ease;
 }
 
@@ -140,7 +129,6 @@
   background: #f3f6fb;
 }
 
-/* Avatar */
 .avatar {
   width: 38px;
   height: 38px;
@@ -154,14 +142,12 @@
   text-transform: uppercase;
 }
 
-/* Name */
 .profile-name {
   font-weight: 600;
   color: #0b2349;
   white-space: nowrap;
 }
 
-/* Logout Button */
 .logout-btn {
   background: transparent;
   border: none;
@@ -179,7 +165,7 @@
   background: #eef4ff;
 }
 
-/* ✅ Main content below header */
+/* Main content below header */
 .admin-content {
   flex: 1;
   margin-top: 100px;
@@ -198,32 +184,60 @@
   border-radius: 8px;
 }
 
-/* ✅ Responsive */
+/* ============================
+   Responsive: sidebar drawer
+   ============================ */
 @media (max-width: 768px) {
   .admin-sidebar {
-    width: 200px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    width: 220px;
   }
-  .admin-main-wrapper {
-    margin-left: 200px;
-  }
-  .admin-header {
-    left: 200px;
-    padding: 0 26px;
-  }
-  .profile-name {
-    display: none;
-  }
-}
 
-@media (max-width: 480px) {
-  .admin-sidebar {
-    display: none;
+  .admin-sidebar.open {
+    transform: translateX(0);
   }
+
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 1100;
+  }
+
+  .sidebar-backdrop.show {
+    display: block;
+  }
+
   .admin-main-wrapper {
     margin-left: 0;
   }
+
   .admin-header {
     left: 0;
     border-radius: 0;
+    padding: 0 20px;
+  }
+
+  .header-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .profile-name {
+    display: none;   /* save space */
+  }
+
+  .admin-content {
+    padding: 20px 16px;
+  }
+}
+
+/* Extra-small tweaks */
+@media (max-width: 480px) {
+  .admin-content {
+    padding: 16px 10px;
   }
 }

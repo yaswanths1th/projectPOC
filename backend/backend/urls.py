@@ -26,5 +26,6 @@ urlpatterns = [
     path("api/viewprofile/", include("apps.viewprofile.urls")),
     path("api/permissions/", include("apps.accounts.urls_permissions")),
     path("api/", include("apps.subscriptions.urls")),
+    path("api/public/plans/",subscription_views.PublicPlanListView.as_view(),name="public-plan-list",),
 
 ]

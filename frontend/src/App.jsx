@@ -25,35 +25,65 @@ import AdminProtectedRoute from "./components/AdminProtectedRoute";
 
 import UserLayout from "./layouts/UserLayout";
 
-// 👉 Make sure filename matches exactly
 import { loadMessages } from "./utils/messageloader";
-// add these imports near the others
+
 import PlansPage from "./pages/PlansPage";
 import AIChat from "./pages/AIChat";
-import BillingPage from "./pages/BillingPage"; // <-- ADDED
+import BillingPage from "./pages/BillingPage";
+
+// ✅ Landing / pricing page
+import LandingPage from "./pages/LandingPage";
 
 function App() {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
   const [msgsReady, setMsgsReady] = useState(false);
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     const init = async () => {
-      await loadMessages();
-      setMsgsReady(true);
+      try {
+        await loadMessages();
+      } catch (e) {
+        console.error("[App] Failed to load messages:", e);
+      } finally {
+        setMsgsReady(true);
+      }
     };
     init();
   }, []);
 
+  // sync user if localStorage changes (other tab / logout)
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.key === "user") {
+        try {
+          setUser(JSON.parse(e.newValue || "null"));
+        } catch {
+          setUser(null);
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
   if (!msgsReady) {
     return (
-      <div style={{
-        width: "100%",
-        height: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "22px"
-      }}>
+      <div
+        style={{
+          width: "100%",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "22px",
+        }}
+      >
         Loading...
       </div>
     );
@@ -61,21 +91,22 @@ function App() {
 
   const getDefaultRoute = () => {
     if (!user) return "/login";
-
     const roleId = Number(user.role_id);
-
-    if (!isNaN(roleId) && roleId !== 2) {
-      return "/admin/dashboard";  // admin
+    if (!Number.isNaN(roleId) && roleId !== 2) {
+      return "/admin/dashboard"; // admin / non-user role
     }
-    return "/dashboard"; // user
+    return "/dashboard"; // normal user
   };
-
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to={getDefaultRoute()} />} />
+      {/* Root: if not logged in → landing, if logged in → redirect */}
+      <Route
+        path="/"
+        element={user ? <Navigate to={getDefaultRoute()} /> : <LandingPage />}
+      />
 
-      {/* Public */}
+      {/* Public auth routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -93,11 +124,14 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="profile" element={<ViewProfile />} />
         <Route path="addresses" element={<AddressPage />} />
-        <Route path="edit-profile" element={<EditProfilePage isAdminRoute={false} />} />
+        <Route
+          path="edit-profile"
+          element={<EditProfilePage isAdminRoute={false} />}
+        />
         <Route path="change-password" element={<ChangePassword />} />
         <Route path="account/plans" element={<PlansPage />} />
         <Route path="account/ai" element={<AIChat />} />
-        <Route path="billing" element={<BillingPage />} /> {/* <-- ADDED */}
+        <Route path="billing" element={<BillingPage />} />
       </Route>
 
       {/* Admin routes */}
@@ -115,7 +149,10 @@ function App() {
         <Route path="users/edit/:id" element={<EditUserPage />} />
         <Route path="users/:userId" element={<ViewProfile />} />
         <Route path="profile" element={<ViewProfile />} />
-        <Route path="profile/edit" element={<EditProfilePage isAdminRoute={true} />} />
+        <Route
+          path="profile/edit"
+          element={<EditProfilePage isAdminRoute={true} />}
+        />
         <Route path="change-password" element={<ChangePassword />} />
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<AdminSettings />} />

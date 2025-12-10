@@ -2,21 +2,28 @@
 .user-layout {
   min-height: 100vh;
   background: #f5f7ff;
+  display: flex;
 }
 
-/* Lighter Sidebar */
+/* BACKDROP (mobile only, hidden on desktop) */
+.sidebar-backdrop {
+  display: none;
+}
+
+/* Sidebar */
 .user-sidebar {
   position: fixed;
   left: 0;
   top: 0;
   bottom: 0;
   width: 240px;
-  background: #0b2349;   /* ✅ Lighter than admin */
+  background: #0b2349;   /* lighter blue */
   color: white;
   padding: 25px 15px;
   display: flex;
   flex-direction: column;
   gap: 24px;
+  z-index: 1000;
 }
 
 /* Sidebar header */
@@ -52,33 +59,16 @@
 
 .sidebar-menu li.active a,
 .sidebar-menu li a:hover {
-  background: #314a7d;   /* ✅ Soft hover */
+  background: #314a7d;   /* hover/active */
   color: #fff;
 }
 
-/* Sidebar logout */
-.sidebar-logout {
-  margin-top: auto;
-  background: #d9534f;
-  color: white;
-  border: none;
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sidebar-logout:hover {
-  background: #c14440;
-}
-
-/* CONTENT: push it to the right of sidebar */
+/* CONTENT: push it to the right of sidebar on desktop */
 .user-content {
   margin-left: 240px;
   min-height: 100vh;
   padding: 20px;
+  flex: 1;
 }
 
 /* Header bar */
@@ -90,9 +80,18 @@
   padding: 12px 18px;
   border-radius: 10px;
   margin-bottom: 18px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   font-weight: 600;
   color: #003691;
+}
+
+/* Hamburger button – hidden on desktop */
+.header-menu-btn {
+  display: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  margin-right: 10px;
 }
 
 .header-logout-btn {
@@ -114,4 +113,56 @@
 
 .user-page-container {
   padding-top: 6px;
+}
+
+/* =========================================
+   MOBILE: make sidebar a drawer + sticky header
+   ========================================= */
+@media (max-width: 768px) {
+  .user-layout {
+    display: block;
+  }
+
+  .user-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .user-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 900;
+  }
+
+  .sidebar-backdrop.show {
+    display: block;
+  }
+
+  .user-content {
+    margin-left: 0;
+    padding: 16px;
+    padding-top: 70px; /* room for fixed header */
+  }
+
+  .user-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    border-radius: 0;
+    margin-bottom: 0;
+    z-index: 950;
+  }
+
+  .header-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }

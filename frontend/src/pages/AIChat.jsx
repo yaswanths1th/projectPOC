@@ -7,44 +7,121 @@ import "./AIChat.css";
 
 /**
  * AIChat component — fullscreen layout (no auto-scroll).
- * Now works with subscription-based AI gating from backend.
+ * Uses subscription-based AI gating from backend AND
+ * refreshes profile on mount so DB changes (like can_use_ai flip)
+ * are picked up without a full page refresh.
  */
+
+const PROFILE_URL = `${API_URL}/api/auth/profile/`;
+
+// Shared helper: determine AI permission from subscription
+function detectCanUseAI(u) {
+  if (!u) return false;
+  const s = u.subscription || null;
+  if (!s) return false;
+
+  // New serializer shape: subscription has can_use_ai boolean
+  if (typeof s.can_use_ai === "boolean") return s.can_use_ai;
+
+  // Fallbacks for older shapes
+  if (s.plan && typeof s.plan.can_use_ai === "boolean") return s.plan.can_use_ai;
+  if (typeof s.slug === "string" && s.slug.toLowerCase() === "enterprise") return true;
+
+  return false;
+}
 
 export default function AIChat() {
   const { user, setUser } = useContext(UserContext) || {};
+
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState([]); // { role, text, ts }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Local "effective" user and AI flag (we refresh on mount)
+  const [effectiveUser, setEffectiveUser] = useState(() => {
+    // initial guess: use context, else localStorage
+    if (user) return user;
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  });
+  const [canUseAI, setCanUseAI] = useState(() => detectCanUseAI(
+    (user ||
+      (() => {
+        try {
+          return JSON.parse(localStorage.getItem("user") || "null");
+        } catch {
+          return null;
+        }
+      })())
+  ));
 
   // No auto-scroll
   useEffect(() => {
     // intentionally empty
   }, [messages, loading]);
 
-  // Read canonical user (context preferred, fallback to localStorage)
-  const localUser =
-    user ||
-    (() => {
+  // 🔥 On mount, refresh profile from backend so DB changes are visible
+  useEffect(() => {
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setEffectiveUser(null);
+      setCanUseAI(false);
+      return;
+    }
+
+    const doRefresh = async () => {
       try {
-        return JSON.parse(localStorage.getItem("user") || "null");
-      } catch {
-        return null;
+        let fresh = null;
+
+        // Prefer the global refresh helper exposed by UserContext
+        if (typeof window !== "undefined" && typeof window.__refreshUser === "function") {
+          fresh = await window.__refreshUser();
+        } else {
+          // Direct call to profile endpoint
+          const res = await axios.get(PROFILE_URL, {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 8000,
+          });
+          fresh = res.data;
+          if (setUser) setUser(fresh);
+          try {
+            localStorage.setItem("user", JSON.stringify(fresh));
+          } catch {}
+        }
+
+        if (!fresh) return;
+        setEffectiveUser(fresh);
+        setCanUseAI(detectCanUseAI(fresh));
+      } catch (e) {
+        console.warn("[AIChat] profile refresh on mount failed:", e);
+        // Best effort: fall back to whatever we already had
+        const fallback = user || (() => {
+          try {
+            return JSON.parse(localStorage.getItem("user") || "null");
+          } catch {
+            return null;
+          }
+        })();
+        setEffectiveUser(fallback);
+        setCanUseAI(detectCanUseAI(fallback));
       }
-    })();
+    };
 
-  // Determine AI permission from subscription
-  function detectCanUseAI(u) {
-    if (!u) return false;
-    const s = u.subscription || null;
-    if (!s) return false;
-    if (typeof s.can_use_ai === "boolean") return s.can_use_ai;
-    if (s.plan && typeof s.plan.can_use_ai === "boolean") return s.plan.can_use_ai;
-    if (typeof s.slug === "string" && s.slug.toLowerCase() === "enterprise") return true;
-    return false;
-  }
+    doRefresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const canUseAI = detectCanUseAI(localUser);
+  // If context.user changes (e.g., after subscribe), sync it into this component
+  useEffect(() => {
+    if (user) {
+      setEffectiveUser(user);
+      setCanUseAI(detectCanUseAI(user));
+    }
+  }, [user]);
 
   // Candidate endpoints - try each until success
   const aiEndpoints = [
@@ -76,16 +153,32 @@ export default function AIChat() {
     }
   }
 
-  // Try to refresh profile from likely endpoints
+  // Try to refresh profile from likely endpoints (fallback if window.__refreshUser is missing)
   async function refetchProfileOnce(token) {
     if (!token) return null;
-    const profileCandidates = [
+
+    // Prefer window.__refreshUser if present
+    if (typeof window !== "undefined" && typeof window.__refreshUser === "function") {
+      try {
+        const fresh = await window.__refreshUser();
+        if (fresh) {
+          setEffectiveUser(fresh);
+          setCanUseAI(detectCanUseAI(fresh));
+          return fresh;
+        }
+      } catch (e) {
+        console.warn("[AIChat] window.__refreshUser in refetchProfileOnce failed:", e);
+      }
+    }
+
+    const candidates = [
       `${(API_URL || "").replace(/\/+$/, "")}/api/auth/profile/`,
       `${(API_URL || "").replace(/\/+$/, "")}/api/profile/`,
       `${(API_URL || "").replace(/\/+$/, "")}/accounts/profile/`,
       `${(API_URL || "").replace(/\/+$/, "")}/api/viewprofile/`,
     ];
-    for (const endpoint of profileCandidates) {
+
+    for (const endpoint of candidates) {
       try {
         const r = await axios.get(endpoint, {
           headers: { Authorization: `Bearer ${token}` },
@@ -95,7 +188,9 @@ export default function AIChat() {
           try {
             setUser && setUser(r.data);
             localStorage.setItem("user", JSON.stringify(r.data));
-          } catch (e) {}
+          } catch {}
+          setEffectiveUser(r.data);
+          setCanUseAI(detectCanUseAI(r.data));
           return r.data;
         }
       } catch (e) {
@@ -113,6 +208,7 @@ export default function AIChat() {
     const payload = { prompt: promptText };
     let lastFailure = null;
 
+    // First pass: try all endpoints
     for (const ep of aiEndpoints) {
       const attempt = await callEndpoint(ep, token, payload);
       if (attempt.ok) return attempt;
@@ -121,8 +217,11 @@ export default function AIChat() {
       if (attempt.status === 401) return attempt;
     }
 
-    // If 403/404 and locally looks like they should have AI, refresh profile and retry once
-    if ((lastFailure?.status === 403 || lastFailure?.status === 404) && detectCanUseAI(localUser)) {
+    // If 403/404 and local user looks like they SHOULD have AI, refresh profile & retry once
+    if (
+      (lastFailure?.status === 403 || lastFailure?.status === 404) &&
+      detectCanUseAI(effectiveUser)
+    ) {
       const refreshed = await refetchProfileOnce(token);
       if (refreshed && detectCanUseAI(refreshed)) {
         for (const ep of aiEndpoints) {
@@ -249,6 +348,8 @@ export default function AIChat() {
     return <div className="system-msg">{m.text}</div>;
   }
 
+  // ---------- RENDERING ----------
+
   // If local user lacks AI, show upgrade prompt (but still allow test send)
   if (!canUseAI) {
     return (
@@ -257,14 +358,14 @@ export default function AIChat() {
           <header className="ai-main-header">
             <h2 className="ai-title">AI Chat</h2>
             <div className="ai-user-info">
-              {localUser?.email ?? localUser?.username ?? "User"}
+              {effectiveUser?.email ?? effectiveUser?.username ?? "User"}
             </div>
           </header>
 
           <div className="ai-upgrade-msg boxed">
             AI access is not enabled for your current subscription.
             <br />
-            {localUser
+            {effectiveUser
               ? "Please upgrade to Enterprise (or a plan with AI) to use chat. You can still test the endpoint below."
               : "Please log in first."}
           </div>
@@ -335,7 +436,7 @@ export default function AIChat() {
           </div>
           <div className="ai-right">
             <div className="ai-user-info">
-              {localUser?.email ?? localUser?.username ?? "User"}
+              {effectiveUser?.email ?? effectiveUser?.username ?? "User"}
             </div>
           </div>
         </header>
