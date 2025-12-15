@@ -97,7 +97,7 @@
 .header-logout-btn {
   background: transparent;
   border: none;
-  color: #003691;
+  color: #f7f8f8;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -108,7 +108,7 @@
 }
 
 .header-logout-btn:hover {
-  background: #eef4ff;
+  background: #f60505;
 }
 
 .user-page-container {

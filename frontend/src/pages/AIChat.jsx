@@ -7,29 +7,16 @@ import "./AIChat.css";
 import ReactMarkdown from "react-markdown";
 import { FiTrash2 } from "react-icons/fi"; // 🗑 delete icon
 
-/**
- * AIChat component with:
- * - Left sidebar for chat sessions (tabs, like ChatGPT)
- * - Messages loaded/saved from backend (no localStorage history)
- * - Subscription-based AI gating (canUseAI)
- */
-
 const PROFILE_URL = `${API_URL}/api/auth/profile/`;
 const SESSIONS_BASE_URL = `${(API_URL || "").replace(/\/+$/, "")}/api/chat/sessions/`;
 
-// Shared helper: determine AI permission from subscription
 function detectCanUseAI(u) {
   if (!u) return false;
   const s = u.subscription || null;
   if (!s) return false;
-
-  // New serializer shape: subscription has can_use_ai boolean
   if (typeof s.can_use_ai === "boolean") return s.can_use_ai;
-
-  // Fallbacks for older shapes
   if (s.plan && typeof s.plan.can_use_ai === "boolean") return s.plan.can_use_ai;
   if (typeof s.slug === "string" && s.slug.toLowerCase() === "enterprise") return true;
-
   return false;
 }
 
@@ -37,20 +24,15 @@ export default function AIChat() {
   const { user, setUser } = useContext(UserContext) || {};
 
   const [prompt, setPrompt] = useState("");
-  const [messages, setMessages] = useState([]); // { role, text, ts }
-  const [sessions, setSessions] = useState([]); // { id, title, created_at, updated_at, message_count }
+  const [messages, setMessages] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // 🔴 Delete confirmation popup state
-  const [deletePopup, setDeletePopup] = useState({
-    show: false,
-    sessionId: null,
-  });
+  const [deletePopup, setDeletePopup] = useState({ show: false, sessionId: null });
 
-  // Local "effective" user and AI flag (we refresh on mount)
   const [effectiveUser, setEffectiveUser] = useState(() => {
     if (user) return user;
     try {
@@ -73,7 +55,9 @@ export default function AIChat() {
     )
   );
 
-  // 🔥 On mount, refresh profile so DB changes are visible
+  // New: sidebar expanded state for mobile toggle
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+
   useEffect(() => {
     const token = localStorage.getItem("access");
     if (!token) {
@@ -85,12 +69,9 @@ export default function AIChat() {
     const doRefresh = async () => {
       try {
         let fresh = null;
-
-        // Prefer global helper from UserContext if present
         if (typeof window !== "undefined" && typeof window.__refreshUser === "function") {
           fresh = await window.__refreshUser();
         } else {
-          // Direct call to profile endpoint
           const res = await axios.get(PROFILE_URL, {
             headers: { Authorization: `Bearer ${token}` },
             timeout: 8000,
@@ -99,9 +80,7 @@ export default function AIChat() {
           if (setUser) setUser(fresh);
           try {
             localStorage.setItem("user", JSON.stringify(fresh));
-          } catch {
-            // ignore
-          }
+          } catch {}
         }
 
         if (!fresh) return;
@@ -127,15 +106,12 @@ export default function AIChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // If context.user changes (e.g., after subscribe), sync it
   useEffect(() => {
     if (user) {
       setEffectiveUser(user);
       setCanUseAI(detectCanUseAI(user));
     }
   }, [user]);
-
-  // -------- Helpers to load sessions & messages from backend --------
 
   async function loadMessagesForSession(sessionId, tokenOverride) {
     const token = tokenOverride || localStorage.getItem("access");
@@ -156,7 +132,6 @@ export default function AIChat() {
     }
   }
 
-  // Load sessions when user/effectiveUser is ready
   useEffect(() => {
     const token = localStorage.getItem("access");
     if (!token || !effectiveUser) return;
@@ -170,7 +145,6 @@ export default function AIChat() {
         const list = res.data || [];
         setSessions(list);
 
-        // If no active session yet, pick the most recent one
         if (!activeSessionId && list.length > 0) {
           const firstId = list[0].id;
           setActiveSessionId(firstId);
@@ -188,7 +162,6 @@ export default function AIChat() {
   async function ensureActiveSession(token) {
     if (activeSessionId) return activeSessionId;
 
-    // Create a new chat session if none is active
     try {
       const res = await axios.post(
         SESSIONS_BASE_URL,
@@ -201,7 +174,7 @@ export default function AIChat() {
           timeout: 15000,
         }
       );
-      const newSession = res.data;
+      const newSession = { ...res.data, message_count: 0 };
       setSessions((prev) => [newSession, ...prev]);
       setActiveSessionId(newSession.id);
       setMessages([]);
@@ -216,6 +189,10 @@ export default function AIChat() {
   async function handleSelectSession(id) {
     setActiveSessionId(id);
     await loadMessagesForSession(id);
+    // On mobile, auto-collapse sidebar so chat gets screen space
+    if (typeof window !== "undefined" && window.innerWidth <= 768) {
+      setSidebarExpanded(false);
+    }
   }
 
   async function handleNewChat() {
@@ -239,20 +216,20 @@ export default function AIChat() {
       );
 
       const newSession = res.data;
-      // put the new chat at the top of the list
       setSessions((prev) => [newSession, ...prev]);
-
-      // switch UI to this chat
       setActiveSessionId(newSession.id);
-      setMessages([]); // fresh empty conversation
+      setMessages([]);
       setError(null);
+      // expand sidebar on mobile to show the new session
+      if (typeof window !== "undefined" && window.innerWidth <= 768) {
+        setSidebarExpanded(true);
+      }
     } catch (e) {
       console.error("[AIChat] failed to create new chat:", e);
       setError("Failed to start a new chat session.");
     }
   }
 
-  // Internal helper: actually delete session in backend and update state
   async function deleteSessionById(id) {
     const token = localStorage.getItem("access");
     if (!token) {
@@ -269,7 +246,6 @@ export default function AIChat() {
       setSessions((prev) => {
         const remaining = prev.filter((s) => s.id !== id);
 
-        // If we just deleted the active one, move to next
         if (activeSessionId === id) {
           const nextId = remaining.length > 0 ? remaining[0].id : null;
           setActiveSessionId(nextId);
@@ -288,25 +264,20 @@ export default function AIChat() {
     }
   }
 
-  // Open popup when clicking delete icon
   function openDeletePopup(id, e) {
     if (e) e.stopPropagation();
     setDeletePopup({ show: true, sessionId: id });
   }
 
-  // Cancel popup
   function cancelDelete() {
     setDeletePopup({ show: false, sessionId: null });
   }
 
-  // Confirm deletion from popup
   async function confirmDelete() {
     if (!deletePopup.sessionId) return;
     await deleteSessionById(deletePopup.sessionId);
     setDeletePopup({ show: false, sessionId: null });
   }
-
-  // -------- Send message via backend session endpoint --------
 
   async function handleSend() {
     const text = prompt.trim();
@@ -323,15 +294,27 @@ export default function AIChat() {
     const sessionId = await ensureActiveSession(token);
     if (!sessionId) return;
 
-    // Optimistically show user's message
     const nowTs = new Date().toISOString();
     const userMsg = { role: "user", text, ts: nowTs };
     setMessages((prev) => [...prev, userMsg]);
     setPrompt("");
     setLoading(true);
 
+
+    // ✅ FIX: update session title + message count immediately
+setSessions((prev) =>
+  prev.map((s) =>
+    s.id === sessionId
+      ? {
+          ...s,
+          title: s.title === "New chat" ? text.slice(0, 40) : s.title,
+          message_count: (s.message_count || 0) + 1,
+        }
+      : s
+  )
+);
+
     if (!canUseAI) {
-      // Advisory: frontend thinks plan has no AI
       setError(
         "Your plan does not show AI access locally. If backend disagrees, you'll see a 403 or success below."
       );
@@ -357,6 +340,15 @@ export default function AIChat() {
 
       const aiMsg = { role: "assistant", text: finalText, ts: new Date().toISOString() };
       setMessages((prev) => [...prev, aiMsg]);
+
+      // ✅ FIX: increment count for AI reply
+setSessions((prev) =>
+  prev.map((s) =>
+    s.id === sessionId
+      ? { ...s, message_count: (s.message_count || 0) + 1 }
+      : s
+  )
+);
     } catch (err) {
       console.error("[AIChat] send error:", err);
 
@@ -395,7 +387,6 @@ export default function AIChat() {
     }
   }
 
-  // ---------- Message bubble renderer (Markdown enabled for assistant) ----------
   function renderBubble(m) {
     const time = new Date(m.ts).toLocaleTimeString([], {
       hour: "2-digit",
@@ -430,8 +421,6 @@ export default function AIChat() {
     return <div className="system-msg">{m.text}</div>;
   }
 
-  // ---------- MAIN RENDER ----------
-
   const userLabel = effectiveUser?.email ?? effectiveUser?.username ?? "User";
 
   return (
@@ -439,15 +428,30 @@ export default function AIChat() {
       <main className="ai-main-noscroll">
         <div className="ai-layout">
           {/* LEFT: sessions sidebar */}
-          <aside className="ai-sidebar">
+          <aside className={`ai-sidebar ${sidebarExpanded ? "expanded" : "collapsed"}`}>
             <div className="ai-sidebar-header">
               <h3>Chats</h3>
+
+              {/* mobile toggle button: visible only on mobile via CSS */}
+              <button
+                className="mobile-toggle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSidebarExpanded((s) => !s);
+                }}
+                aria-expanded={sidebarExpanded}
+                aria-label={sidebarExpanded ? "Collapse chats" : "Expand chats"}
+                type="button"
+              >
+                {sidebarExpanded ? "✕" : "☰"}
+              </button>
+
               <button className="btn btn-new-chat" onClick={handleNewChat}>
                 + New Chat
               </button>
             </div>
 
-            <div className="ai-session-list">
+            <div className="ai-session-list" role="list">
               {sessions.length === 0 && (
                 <div className="ai-session-empty">No chats yet. Start a new one.</div>
               )}
@@ -459,6 +463,7 @@ export default function AIChat() {
                     "ai-session-item" + (s.id === activeSessionId ? " active-session" : "")
                   }
                   onClick={() => handleSelectSession(s.id)}
+                  role="listitem"
                 >
                   <div className="ai-session-title">{s.title || "New chat"}</div>
                   <div className="ai-session-meta">
@@ -468,6 +473,7 @@ export default function AIChat() {
                     className="ai-session-delete"
                     onClick={(e) => openDeletePopup(s.id, e)}
                     aria-label="Delete chat"
+                    type="button"
                   >
                     <FiTrash2 size={15} />
                   </button>
@@ -481,9 +487,7 @@ export default function AIChat() {
             <header className="ai-main-header">
               <div className="ai-left">
                 <h2 className="ai-title">AI Chat</h2>
-                <div className="ai-sub">
-                  Ask anything — your messages are proxied to the backend Gemini endpoint.
-                </div>
+                <div className="ai-sub">Ask anything</div>
                 {!canUseAI && (
                   <div className="ai-upgrade-msg inline">
                     AI access is not enabled for your current subscription. You may receive 403
@@ -498,7 +502,7 @@ export default function AIChat() {
 
             <div className="ai-chat-area-noscroll">
               {messages.length === 0 && !loading && (
-                <div className="ai-placeholder">Start the conversation...</div>
+                <div className="ai-placeholder">Start the conversation..</div>
               )}
               <div className="messages-list">
                 {messages.map((m, i) => (
@@ -534,6 +538,7 @@ export default function AIChat() {
                       setMessages([]);
                       setError(null);
                     }}
+                    type="button"
                   >
                     Clear
                   </button>
@@ -541,6 +546,7 @@ export default function AIChat() {
                     className="btn btn-send"
                     onClick={handleSend}
                     disabled={loading || !prompt.trim()}
+                    type="button"
                   >
                     {loading ? "Sending..." : "Send"}
                   </button>
@@ -550,17 +556,16 @@ export default function AIChat() {
           </section>
         </div>
 
-        {/* 🔴 Delete confirmation popup */}
         {deletePopup.show && (
           <div className="popup-backdrop">
             <div className="popup-box">
               <h3>Delete this chat?</h3>
               <p>This action cannot be undone.</p>
               <div className="popup-actions">
-                <button className="btn-cancel" onClick={cancelDelete}>
+                <button className="btn-cancel" onClick={cancelDelete} type="button">
                   Cancel
                 </button>
-                <button className="btn-delete" onClick={confirmDelete}>
+                <button className="btn-delete" onClick={confirmDelete} type="button">
                   Delete
                 </button>
               </div>

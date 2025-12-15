@@ -212,9 +212,9 @@ export default function LandingPage() {
           role="button"
           tabIndex={0}
         >
-          <span className="lp-logo-mark">N</span>
+          <span className="lp-logo-mark">E</span>
           <div className="lp-logo-text">
-            <span className="lp-logo-title">Neonflake HR Suite</span>
+            <span className="lp-logo-title">Evolvix HR Suite</span>
             <span className="lp-logo-subtitle">Smart HR & Payroll Cloud</span>
           </div>
         </div>
@@ -267,7 +267,7 @@ export default function LandingPage() {
               Modern <span>HR & Payroll</span> for growing teams.
             </h1>
             <p>
-              Neonflake HR Suite automates attendance, payroll, performance, and
+              Evolvix HR Suite automates attendance, payroll, performance, and
               approvals – so your HR team can focus on people, not paperwork.
             </p>
 
@@ -458,7 +458,7 @@ export default function LandingPage() {
 
         {/* How It Works Section */}
         <section id="how-it-works" className="lp-section lp-how">
-          <h2>How Neonflake HR Suite works</h2>
+          <h2>How Evolvix HR Suite works</h2>
           <div className="lp-how-grid">
             <div className="lp-how-step">
               <span className="lp-step-number">1</span>
@@ -492,7 +492,7 @@ export default function LandingPage() {
       <footer className="lp-footer">
         <div className="lp-footer-left">
           <span className="lp-footer-brand">
-            © {new Date().getFullYear()} Neonflake HR Suite.
+            © {new Date().getFullYear()} Evolvix HR Suite.
           </span>
           <span className="lp-footer-text">Built for modern HR teams.</span>
         </div>

@@ -64,7 +64,7 @@ export default function AdminLayout() {
 
   const handleLogout = () => {
     localStorage.clear();
-    navigate("/login");
+    navigate("/");
   };
 
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);

@@ -20,12 +20,21 @@
 .ai-sidebar {
   width: 240px;
   min-width: 220px;
-  background: #f4f6ff;
+  background: #dde0e2;
   border-radius: 12px;
   padding: 10px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
+  transition: max-height 220ms ease, padding 220ms ease;
+}
+
+.ai-sidebar.expanded {
+  /* desktop unaffected; this mainly aids mobile */
+}
+
+.ai-sidebar.collapsed {
+  /* default on desktop, but on mobile .collapsed will be applied and limit height */
 }
 
 .ai-sidebar-header {
@@ -33,6 +42,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  gap: 8px;
 }
 
 .ai-session-list {
@@ -105,6 +115,18 @@
   color: #fff;
 }
 
+/* mobile toggle - hidden on desktop */
+.mobile-toggle {
+  display: none;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  color: #0b2349;
+}
+
 /* ====== CHAT PANE ====== */
 
 .ai-chat-pane {
@@ -115,7 +137,6 @@
   padding: 14px 16px 0;
   display: flex;
   flex-direction: column;
-  /* height so the composer fits & nothing goes under the taskbar */
   max-height: calc(100vh - 140px);
 }
 
@@ -146,7 +167,10 @@
 .ai-chat-area-noscroll {
   flex: 1;
   overflow-y: auto;
+  min-height: 300px;
   padding: 4px 4px 12px 0;
+  background-color: #e1e7f0;
+  border-radius: 12px;
 }
 
 /* Messages list */
@@ -218,7 +242,7 @@
 .markdown-text ol,
 .markdown-text ul {
   margin: 0 0 6px 1.2rem;
-  padding-left: 1.1rem;   /* keep numbers inside bubble */
+  padding-left: 1.1rem;
 }
 
 .markdown-text li {
@@ -233,6 +257,7 @@
   margin-top: 6px;
   background: #f9fbff;
 }
+
 
 .ai-input {
   width: 100%;
@@ -316,7 +341,7 @@
 .btn-cancel {
   flex: 1;
   border: none;
-  background: #e0e0e0;
+  background: #120101;
   padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
@@ -330,4 +355,141 @@
   padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
+}
+
+/* =========================
+   MOBILE / RESPONSIVE FIXES
+   Adds targeted tweaks for narrow screens so sidebar
+   doesn't push chat off-screen and composer remains visible
+   ========================= */
+
+/* trigger mobile at 768px and below */
+@media (max-width: 768px) {
+  .ai-layout {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  /* show mobile toggle button inside sidebar header */
+  .mobile-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ai-sidebar {
+    width: 100%;
+    min-width: 0;
+    border-radius: 10px;
+    padding: 8px;
+    /* default collapsed state: show only header */
+    max-height: 48px;
+    overflow: hidden;
+  }
+
+  /* when expanded, allow the full sessions list to show */
+  .ai-sidebar.expanded {
+    max-height: 260px; /* shows header + session list */
+    overflow: hidden;
+  }
+
+  .ai-sidebar-header {
+    gap: 6px;
+    align-items: center;
+  }
+
+  .btn.btn-new-chat {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 20px;
+  }
+
+  .ai-session-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(260px - 48px);
+    -webkit-overflow-scrolling: touch;
+    padding-right: 6px;
+  }
+
+  .ai-session-item {
+    padding: 6px 10px 6px 8px;
+    margin-bottom: 6px;
+    border-radius: 8px;
+    font-size: 12px;
+  }
+
+  .ai-session-title {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 36px);
+  }
+
+  .ai-session-meta {
+    font-size: 10px;
+  }
+
+  .ai-session-delete {
+    right: 6px;
+    top: 6px;
+  }
+
+  .ai-chat-pane {
+    padding: 10px 12px 8px;
+    max-height: calc(100vh - 220px);
+  }
+
+  .ai-chat-area-noscroll {
+    min-height: 180px;
+    padding: 6px 2px 8px 0;
+  }
+
+  .ai-composer-noscroll {
+    padding: 8px 0 10px;
+  }
+
+  .ai-input {
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: 8px;
+  }
+
+  .msg-count {
+    display: none;
+  }
+
+  .bot-avatar {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+    margin-right: 6px;
+  }
+
+  .popup-box {
+    width: 90%;
+    padding: 16px;
+  }
+}
+
+/* VERY NARROW PHONES */
+@media (max-width: 420px) {
+  .ai-session-list {
+    max-height: 140px;
+  }
+
+  .ai-session-item {
+    padding-right: 32px;
+  }
+
+  .ai-chat-pane {
+    max-height: calc(100vh - 200px);
+  }
+
+  .ai-chat-area-noscroll {
+    min-height: 160px;
+  }
 }

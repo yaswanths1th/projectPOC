@@ -313,24 +313,24 @@ export default function PlansPage() {
             >
               <h3 className="plan-name">{p.name}</h3>
               <div className="plan-description">{p.description}</div>
-              <div className="plan-price">{money(p.price_cents)}</div>
+              <div className="plan-price">{money(p.price_cents)}/month</div>
 
               <ul className="plan-features">
                 <li>
-                  {aiAllowed ? "✅ AI Chat available" : "❌ No AI Chat bot"}
+                  {aiAllowed ? "AI Chat available" : "No AI Chat bot"}
                 </li>
                 <li>
                   {canEditProfile
-                    ? "✅ Can edit profile"
-                    : "❌ Cannot edit profile"}
+                    ? "Can edit profile"
+                    : "Can't edit profile"}
                 </li>
                 <li>
                   {canChangePassword
-                    ? "✅ Can change password"
-                    : "❌ No password change"}
+                    ? "Can change password"
+                    : "Can't change password"}
                 </li>
                 {maxProjects !== null && (
-                  <li>📁 Max projects: {maxProjects}</li>
+                  <li>Max projects: {maxProjects}</li>
                 )}
               </ul>
 

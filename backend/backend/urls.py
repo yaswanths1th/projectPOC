@@ -28,5 +28,6 @@ urlpatterns = [
     path("api/", include("apps.subscriptions.urls")),
     path("api/public/plans/",subscription_views.PublicPlanListView.as_view(),name="public-plan-list",),
     path("api/chat/", include("apps.ai_chat.urls")),
+    path("api/reports/", include("apps.reports.urls")),
 
 ]

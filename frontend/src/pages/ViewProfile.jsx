@@ -196,7 +196,7 @@ function ViewProfile() {
   return (
     <div className="view-profile-page">
       {/* Simple loading & error banners */}
-      {loading && <p className="vp-loading">Loading profile...</p>}
+      {loading && <p className="vp-loading">{/*loading....*/}</p>}
       {!loading && errorMsg && <p className="vp-error">{errorMsg}</p>}
 
       <div className="view-profile-header">

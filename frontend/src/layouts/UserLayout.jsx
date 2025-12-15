@@ -27,7 +27,8 @@ export default function UserLayout() {
     localStorage.removeItem("access");
     localStorage.removeItem("refresh");
     localStorage.removeItem("user");
-    navigate("/login");
+    
+    window.location.replace("http://localhost:5173/");
   };
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);

@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "apps.change_password",
     "apps.subscriptions",
     "apps.ai_chat",
+    "apps.reports",
 ]
 
 
