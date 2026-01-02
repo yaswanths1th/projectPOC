@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import "./EditUserPage.css";
+import { API_URL } from "../config/api";
 
 /**
  * EditUserPage
@@ -62,6 +63,20 @@ function EditUserPage() {
   const token = localStorage.getItem("access");
   const navigate = useNavigate();
   const { id } = useParams();
+
+  // 🔥 permissions from localStorage.user
+  const [permissions, setPermissions] = useState([]);
+
+  useEffect(() => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      setPermissions(storedUser.permissions || []);
+    } catch {
+      setPermissions([]);
+    }
+  }, []);
+
+  const hasPermission = (code) => permissions.includes(code);
 
   // -------------------------
   // Regex validation rules
@@ -132,21 +147,23 @@ function EditUserPage() {
   // -------------------------
   const loadUserData = useCallback(async () => {
     try {
-      const res = await axios.get(`http://127.0.0.1:8000/api/auth/admin/users/${id}/`, {
+      const res = await axios.get(`${API_URL}/api/auth/admin/users/${id}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUser({
-  ...res.data,
-  username_original: res.data.username,
-  email_original: res.data.email,
-});
+        ...res.data,
+        username_original: res.data.username,
+        email_original: res.data.email,
+      });
 
-
-      const addrRes = await axios.get(`http://127.0.0.1:8000/api/addresses/?user=${id}`, {
+      const addrRes = await axios.get(`${API_URL}/api/addresses/?user=${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const a = Array.isArray(addrRes.data) && addrRes.data.length ? addrRes.data[0] : addrRes.data;
+      const a =
+        Array.isArray(addrRes.data) && addrRes.data.length
+          ? addrRes.data[0]
+          : addrRes.data;
       if (a && typeof a === "object") {
         setAddress({
           id: a.id || null,
@@ -164,7 +181,8 @@ function EditUserPage() {
     } catch {
       // set bottom general error if cached message exists
       (async () => {
-        const msg = (await getErrorText("EA010")) || (await getErrorText("EA011")) || "";
+        const msg =
+          (await getErrorText("EA010")) || (await getErrorText("EA011")) || "";
         setErrors((p) => ({ ...p, general: msg }));
       })();
     }
@@ -172,9 +190,13 @@ function EditUserPage() {
 
   const loadDropdowns = useCallback(async () => {
     try {
-      const deptRes = await axios.get("http://127.0.0.1:8000/api/auth/departments/");
+      const deptRes = await axios.get(
+        `${API_URL}/api/auth/departments/`
+      );
       setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
-      const rolesRes = await axios.get("http://127.0.0.1:8000/api/auth/roles/");
+      const rolesRes = await axios.get(
+        `${API_URL}/api/auth/roles/`
+      );
       setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : []);
     } catch {
       // ignore; optional
@@ -196,7 +218,9 @@ function EditUserPage() {
   // -------------------------
   useEffect(() => {
     if (user.department) {
-      const available = roles.filter((r) => Number(r.department) === Number(user.department));
+      const available = roles.filter(
+        (r) => Number(r.department) === Number(user.department)
+      );
       setFilteredRoles(available);
     } else {
       setFilteredRoles([]);
@@ -213,9 +237,12 @@ function EditUserPage() {
     if (!v) msg = await getValidationText("VA002");
     else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v))
       msg = await getValidationText("VA001");
-    else if (name === "username" && !USERNAME_RE.test(v)) msg = await getValidationText("VA003");
-    else if (name === "email" && !EMAIL_RE.test(v)) msg = await getValidationText("VA005");
-    else if (name === "phone" && !PHONE_RE.test(v)) msg = await getErrorText("EA009");
+    else if (name === "username" && !USERNAME_RE.test(v))
+      msg = await getValidationText("VA003");
+    else if (name === "email" && !EMAIL_RE.test(v))
+      msg = await getValidationText("VA005");
+    else if (name === "phone" && !PHONE_RE.test(v))
+      msg = await getErrorText("EA009");
 
     setErrors((p) => ({ ...p, [name]: msg }));
     return !msg;
@@ -242,10 +269,23 @@ function EditUserPage() {
 
   const validateAll = async () => {
     const personal = ["username", "first_name", "last_name", "phone", "email"];
-    const addr = ["house_flat", "street", "area", "district", "city", "state", "postal_code", "country"];
+    const addr = [
+      "house_flat",
+      "street",
+      "area",
+      "district",
+      "city",
+      "state",
+      "postal_code",
+      "country",
+    ];
 
-    const okPersonal = await Promise.all(personal.map((f) => validatePersonalField(f, user[f] || "")));
-    const okAddress = await Promise.all(addr.map((f) => validateAddressField(f, address[f] || "")));
+    const okPersonal = await Promise.all(
+      personal.map((f) => validatePersonalField(f, user[f] || ""))
+    );
+    const okAddress = await Promise.all(
+      addr.map((f) => validateAddressField(f, address[f] || ""))
+    );
     return [...okPersonal, ...okAddress].every(Boolean);
   };
 
@@ -264,12 +304,20 @@ function EditUserPage() {
 
       // India first
       try {
-        const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+        const res = await fetch(
+          `https://api.postalpincode.in/pincode/${pin}`
+        );
         const data = await res.json();
         if (Array.isArray(data) && data[0]?.Status === "Success") {
           const p = data[0].PostOffice?.[0];
           if (p) {
-            setAddress((prev) => ({ ...prev, city: p.Block || p.Name, district: p.District, state: p.State, country: "India" }));
+            setAddress((prev) => ({
+              ...prev,
+              city: p.Block || p.Name,
+              district: p.District,
+              state: p.State,
+              country: "India",
+            }));
             setErrors((p) => ({ ...p, postal_code: "" }));
             setLoadingPinLookup(false);
             return;
@@ -290,7 +338,12 @@ function EditUserPage() {
       const dat = await res2.json();
       const place = dat.places?.[0];
       if (place) {
-        setAddress((prev) => ({ ...prev, city: place["place name"] || prev.city, state: place["state"] || prev.state, country: dat["country"] || prev.country }));
+        setAddress((prev) => ({
+          ...prev,
+          city: place["place name"] || prev.city,
+          state: place["state"] || prev.state,
+          country: dat["country"] || prev.country,
+        }));
         setErrors((p) => ({ ...p, postal_code: "" }));
       }
     } catch {
@@ -303,72 +356,74 @@ function EditUserPage() {
 
   // -------------------------
   // Immediate uniqueness checks (backend endpoints)
-  // - Called onBlur and when Enter is pressed inside username/email inputs.
-  // - They return a boolean: true = exists, false = available.
   // -------------------------
   const checkUsernameUnique = async (usernameVal) => {
-  // If unchanged from original → NOT duplicate
-  if (usernameVal === user.username_original) {
-    setErrors((p) => ({ ...p, username: "" }));
-    return false;
-  }
-
-  if (!usernameVal || !USERNAME_RE.test(usernameVal)) {
-    return false;
-  }
-
-  try {
-    const res = await axios.get("http://127.0.0.1:8000/api/auth/check-username/", {
-      params: { username: usernameVal },
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const exists = Boolean(res.data?.exists);
-
-    if (exists) {
-      const msg = (await getErrorText("EP016")) || "";
-      setErrors((p) => ({ ...p, username: msg }));
-      return true; // duplicate
-    } else {
+    // If unchanged from original → NOT duplicate
+    if (usernameVal === user.username_original) {
       setErrors((p) => ({ ...p, username: "" }));
       return false;
     }
-  } catch {
-    return false;
-  }
-};
 
+    if (!usernameVal || !USERNAME_RE.test(usernameVal)) {
+      return false;
+    }
+
+    try {
+      const res = await axios.get(
+        `${API_URL}/api/auth/check-username/`,
+        {
+          params: { username: usernameVal },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const exists = Boolean(res.data?.exists);
+
+      if (exists) {
+        const msg = (await getErrorText("EP016")) || "";
+        setErrors((p) => ({ ...p, username: msg }));
+        return true; // duplicate
+      } else {
+        setErrors((p) => ({ ...p, username: "" }));
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  };
 
   const checkEmailUnique = async (emailVal) => {
-  // If unchanged from original → NOT duplicate
-  if (emailVal === user.email_original) {
-    setErrors((p) => ({ ...p, email: "" }));
-    return false;
-  }
-
-  if (!emailVal || !EMAIL_RE.test(emailVal)) {
-    return false;
-  }
-
-  try {
-    const res = await axios.get("http://127.0.0.1:8000/api/auth/check-email/", {
-      params: { email: emailVal },
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const exists = Boolean(res.data?.exists);
-
-    if (exists) {
-      const msg = (await getErrorText("ES003")) || "";
-      setErrors((p) => ({ ...p, email: msg }));
-      return true;
-    } else {
+    // If unchanged from original → NOT duplicate
+    if (emailVal === user.email_original) {
       setErrors((p) => ({ ...p, email: "" }));
       return false;
     }
-  } catch {
-    return false;
-  }
-};
 
+    if (!emailVal || !EMAIL_RE.test(emailVal)) {
+      return false;
+    }
+
+    try {
+      const res = await axios.get(
+        `${API_URL}/api/auth/check-email/`,
+        {
+          params: { email: emailVal },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const exists = Boolean(res.data?.exists);
+
+      if (exists) {
+        const msg = (await getErrorText("ES003")) || "";
+        setErrors((p) => ({ ...p, email: msg }));
+        return true;
+      } else {
+        setErrors((p) => ({ ...p, email: "" }));
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  };
 
   // -------------------------
   // Handlers
@@ -392,9 +447,13 @@ function EditUserPage() {
     if (e.key === "Enter") {
       e.preventDefault();
       if (fieldName === "username") {
-        validatePersonalField("username", user.username || "").then(() => checkUsernameUnique(user.username || ""));
+        validatePersonalField("username", user.username || "").then(() =>
+          checkUsernameUnique(user.username || "")
+        );
       } else if (fieldName === "email") {
-        validatePersonalField("email", user.email || "").then(() => checkEmailUnique(user.email || ""));
+        validatePersonalField("email", user.email || "").then(() =>
+          checkEmailUnique(user.email || "")
+        );
       } else {
         // for other fields run validation
         validatePersonalField(fieldName, user[fieldName] || "");
@@ -407,14 +466,16 @@ function EditUserPage() {
     await validatePersonalField(name, value);
     if (name === "username") await checkUsernameUnique(value);
     if (name === "email") await checkEmailUnique(value);
-    if (name === "postal_code" && value && value.length >= 4) await lookupPostal(value);
+    if (name === "postal_code" && value && value.length >= 4)
+      await lookupPostal(value);
   };
 
   const handleChangeAddress = async (e) => {
     const { name, value } = e.target;
     setAddress((prev) => ({ ...prev, [name]: value }));
     await validateAddressField(name, value);
-    if (name === "postal_code" && value && value.length >= 4) lookupPostal(value);
+    if (name === "postal_code" && value && value.length >= 4)
+      lookupPostal(value);
   };
 
   // -------------------------
@@ -451,7 +512,7 @@ function EditUserPage() {
     try {
       // PUT user
       await axios.put(
-        `http://127.0.0.1:8000/api/auth/admin/users/${id}/`,
+        `${API_URL}/api/auth/admin/users/${id}/`,
         {
           ...user,
           department: user.department ? Number(user.department) : null,
@@ -461,7 +522,9 @@ function EditUserPage() {
       );
 
       // Save address
-      const addrUrl = address.id ? `http://127.0.0.1:8000/api/addresses/${address.id}/` : "http://127.0.0.1:8000/api/addresses/";
+      const addrUrl = address.id
+        ? `${API_URL}/api/addresses/${address.id}/`
+        : `${API_URL}/api/addresses/`;
       await axios({
         method: address.id ? "put" : "post",
         url: addrUrl,
@@ -485,23 +548,31 @@ function EditUserPage() {
 
       if (resp && typeof resp === "object") {
         for (const key of Object.keys(resp)) {
-          const raw = Array.isArray(resp[key]) ? String(resp[key][0]) : String(resp[key]);
+          const raw = Array.isArray(resp[key])
+            ? String(resp[key][0])
+            : String(resp[key]);
           const trimmed = raw.trim();
 
           // Duplicate username → EP016
           if (key === "username") {
-            newErrs.username = (await getErrorText("EP016")) || trimmed;
+            newErrs.username =
+              (await getErrorText("EP016")) || trimmed;
             continue;
           }
 
           // Duplicate email → ES003
           if (key === "email") {
-            newErrs.email = (await getErrorText("ES003")) || trimmed;
+            newErrs.email =
+              (await getErrorText("ES003")) || trimmed;
             continue;
           }
 
           // If raw is a known error code in cache, map it
-          const maybe = (tables.user_error || []).find((it) => String(it?.error_code || "").toUpperCase() === trimmed.toUpperCase());
+          const maybe = (tables.user_error || []).find(
+            (it) =>
+              String(it?.error_code || "").toUpperCase() ===
+              trimmed.toUpperCase()
+          );
           if (maybe) {
             newErrs[key] = maybe.error_message || trimmed;
             continue;
@@ -514,12 +585,20 @@ function EditUserPage() {
         // top-level 'detail' mapping if no field errors
         if (!Object.keys(newErrs).length && resp.detail) {
           const det = String(resp.detail || "").trim();
-          const codeItem = (tables.user_error || []).find((it) => String(it?.error_code || "").toUpperCase() === det.toUpperCase());
+          const codeItem = (tables.user_error || []).find(
+            (it) =>
+              String(it?.error_code || "").toUpperCase() ===
+              det.toUpperCase()
+          );
           newErrs.general = codeItem ? codeItem.error_message : det;
         }
       } else if (typeof resp === "string") {
         const det = resp.trim();
-        const codeItem = (tables.user_error || []).find((it) => String(it?.error_code || "").toUpperCase() === det.toUpperCase());
+        const codeItem = (tables.user_error || []).find(
+          (it) =>
+            String(it?.error_code || "").toUpperCase() ===
+            det.toUpperCase()
+        );
         newErrs.general = codeItem ? codeItem.error_message : det;
       } else {
         newErrs.general = (await getErrorText("EA011")) || "";
@@ -548,55 +627,105 @@ function EditUserPage() {
       </div>
 
       {/* ACCOUNT INFO */}
-      <div className="profile-card account-info">
-        <h3>Account Information</h3>
-        <div className="edit-form-grid">
-          <div className="edit-form-group">
-            <label>Department</label>
-            <select name="department" value={user.department || ""} onChange={handleDepartmentChange}>
-              <option value="">Select Department</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.department_name}
-                </option>
-              ))}
-            </select>
-          </div>
+{/* ACCOUNT INFO */}
+<div className="profile-card account-info">
+  <h3>Account Information</h3>
+  <div className="edit-form-grid">
 
-          <div className="edit-form-group">
-            <label>Role</label>
-            <select
-              name="role"
-              value={user.role || ""}
-              onChange={(e) => setUser((p) => ({ ...p, role: e.target.value }))}
-              disabled={!filteredRoles.length}
-            >
-              <option value="">Select Role</option>
-              {filteredRoles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.role_name}
-                </option>
-              ))}
-            </select>
-          </div>
+    {/* Department */}
+    <div className="edit-form-group">
+      <label>Department</label>
+      {hasPermission("change_department") ? (
+        <select
+          name="department"
+          value={user.department || ""}
+          onChange={handleDepartmentChange}
+        >
+          <option value="">Select Department</option>
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.department_name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type="text"
+          className="readonly-locked"
+          readOnly
+          value={
+            departments.find((d) => d.id === user.department)?.department_name ||
+            "No Department"
+          }
+        />
+      )}
+    </div>
 
-          <div className="edit-form-group">
-            <label>Status</label>
-            <select
-              value={user.is_active ? "Active" : "Inactive"}
-              onChange={(e) => setUser((prev) => ({ ...prev, is_active: e.target.value === "Active" }))}
-            >
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
+    {/* Role */}
+    <div className="edit-form-group">
+      <label>Role</label>
+      {hasPermission("change_role") ? (
+        <select
+          name="role"
+          value={user.role || ""}
+          onChange={(e) =>
+            setUser((p) => ({ ...p, role: e.target.value }))
+          }
+          disabled={!filteredRoles.length}
+        >
+          <option value="">Select Role</option>
+          {filteredRoles.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.role_name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type="text"
+          className="readonly-locked"
+          readOnly
+          value={
+            filteredRoles.find((r) => r.id === user.role)?.role_name || "No Role"
+          }
+        />
+      )}
+    </div>
 
-          <div className="edit-form-group">
-            <label>Date Joined</label>
-            <input readOnly value={user.date_joined?.split("T")[0] || ""} />
-          </div>
-        </div>
-      </div>
+    {/* Status */}
+    <div className="edit-form-group">
+      <label>Status</label>
+      {hasPermission("hold_user") ? (
+        <select
+          value={user.is_active ? "Active" : "Inactive"}
+          onChange={(e) =>
+            setUser((prev) => ({
+              ...prev,
+              is_active: e.target.value === "Active",
+            }))
+          }
+        >
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      ) : (
+        <input
+          type="text"
+          className="readonly-locked"
+          readOnly
+          value={user.is_active ? "Active" : "Inactive"}
+        />
+      )}
+    </div>
+
+    <div className="edit-form-group">
+      <label>Date Joined</label>
+      <input readOnly value={user.date_joined?.split("T")[0] || ""} />
+    </div>
+  </div>
+</div>
+
+
 
       {/* PERSONAL DETAILS */}
       <div className="profile-card">
@@ -611,25 +740,51 @@ function EditUserPage() {
               onBlur={handleBlurField}
               onKeyDown={(e) => handleKeyDownOnField(e, "username")}
             />
-            {errors.username && <div className="alert-box alert-error">{errors.username}</div>}
+            {errors.username && (
+              <div className="alert-box alert-error">{errors.username}</div>
+            )}
           </div>
 
           <div className="edit-form-group">
             <label>First Name</label>
-            <input name="first_name" value={user.first_name || ""} onChange={handleChangeUser} onBlur={handleBlurField} onKeyDown={(e) => handleKeyDownOnField(e, "first_name")} />
-            {errors.first_name && <div className="alert-box alert-error">{errors.first_name}</div>}
+            <input
+              name="first_name"
+              value={user.first_name || ""}
+              onChange={handleChangeUser}
+              onBlur={handleBlurField}
+              onKeyDown={(e) => handleKeyDownOnField(e, "first_name")}
+            />
+            {errors.first_name && (
+              <div className="alert-box alert-error">{errors.first_name}</div>
+            )}
           </div>
 
           <div className="edit-form-group">
             <label>Last Name</label>
-            <input name="last_name" value={user.last_name || ""} onChange={handleChangeUser} onBlur={handleBlurField} onKeyDown={(e) => handleKeyDownOnField(e, "last_name")} />
-            {errors.last_name && <div className="alert-box alert-error">{errors.last_name}</div>}
+            <input
+              name="last_name"
+              value={user.last_name || ""}
+              onChange={handleChangeUser}
+              onBlur={handleBlurField}
+              onKeyDown={(e) => handleKeyDownOnField(e, "last_name")}
+            />
+            {errors.last_name && (
+              <div className="alert-box alert-error">{errors.last_name}</div>
+            )}
           </div>
 
           <div className="edit-form-group">
             <label>Phone</label>
-            <input name="phone" value={user.phone || ""} onChange={handleChangeUser} onBlur={handleBlurField} onKeyDown={(e) => handleKeyDownOnField(e, "phone")} />
-            {errors.phone && <div className="alert-box alert-error">{errors.phone}</div>}
+            <input
+              name="phone"
+              value={user.phone || ""}
+              onChange={handleChangeUser}
+              onBlur={handleBlurField}
+              onKeyDown={(e) => handleKeyDownOnField(e, "phone")}
+            />
+            {errors.phone && (
+              <div className="alert-box alert-error">{errors.phone}</div>
+            )}
           </div>
 
           <div className="edit-form-group">
@@ -641,7 +796,9 @@ function EditUserPage() {
               onBlur={handleBlurField}
               onKeyDown={(e) => handleKeyDownOnField(e, "email")}
             />
-            {errors.email && <div className="alert-box alert-error">{errors.email}</div>}
+            {errors.email && (
+              <div className="alert-box alert-error">{errors.email}</div>
+            )}
           </div>
         </div>
       </div>
@@ -658,31 +815,65 @@ function EditUserPage() {
             { key: "district", label: "District" },
             { key: "city", label: "City" },
             { key: "state", label: "State" },
-            { key: "postal_code", label: loadingPinLookup ? "Postal Code (Fetching...)" : "Postal Code" },
+            {
+              key: "postal_code",
+              label: loadingPinLookup
+                ? "Postal Code (Fetching...)"
+                : "Postal Code",
+            },
             { key: "country", label: "Country" },
           ].map(({ key, label }) => (
             <div className="edit-form-group" key={key}>
               <label>{label}</label>
-              <input name={key} value={address[key] || ""} onChange={handleChangeAddress} onBlur={handleBlurField} onKeyDown={(e) => handleKeyDownOnField(e, key)} />
-              {errors[key] && <div className="alert-box alert-error">{errors[key]}</div>}
+              <input
+                name={key}
+                value={address[key] || ""}
+                onChange={handleChangeAddress}
+                onBlur={handleBlurField}
+                onKeyDown={(e) => handleKeyDownOnField(e, key)}
+              />
+              {errors[key] && (
+                <div className="alert-box alert-error">{errors[key]}</div>
+              )}
             </div>
           ))}
         </div>
       </div>
 
       {/* GLOBAL BOTTOM MESSAGES (error / success) */}
-      <div className="edit-user-bottom-messages" style={{ marginTop: 16 }}>
-        {errors.general && <div className="alert-box alert-error bottom-alert">{errors.general}</div>}
-        {successMsg && <div className="alert-box alert-success bottom-alert">{successMsg}</div>}
+      <div
+        className="edit-user-bottom-messages"
+        style={{ marginTop: 16 }}
+      >
+        {errors.general && (
+          <div className="alert-box alert-error bottom-alert">
+            {errors.general}
+          </div>
+        )}
+        {successMsg && (
+          <div className="alert-box alert-success bottom-alert">
+            {successMsg}
+          </div>
+        )}
       </div>
 
       {/* Save / Cancel */}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: "12px",
+          marginTop: 16,
+        }}
+      >
         <button className="save-btn" onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save Changes"}
         </button>
 
-        <button className="cancel-btn" onClick={() => navigate("/admin/users")}>
+        <button
+          className="cancel-btn"
+          onClick={() => navigate("/admin/users")}
+        >
           Cancel
         </button>
       </div>

@@ -1,77 +1,171 @@
+// frontend/src/pages/ViewProfile.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./ViewProfilePage.css";
 import axios from "axios";
+import { API_URL } from "../config/api";
 
 function ViewProfile() {
   const [user, setUser] = useState({});
   const [address, setAddress] = useState({});
   const [departments, setDepartments] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [canEditProfile, setCanEditProfile] = useState(false);
+  const [canChangePassword, setCanChangePassword] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+
 
   const token = localStorage.getItem("access");
-  const storedUser = JSON.parse(localStorage.getItem("user"));
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
 
   const navigate = useNavigate();
   const { userId } = useParams();
 
-  const isAdminLoggedIn = storedUser?.is_admin;
   const isViewingOtherUser = !!userId;
+
+  // compute admin flag from stored user; NOT in deps
+  const isAdminLoggedIn = (() => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      return !!storedUser?.is_admin;
+    } catch {
+      return false;
+    }
+  })();
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     return `${date.getDate()}-${months[date.getMonth()]}-${date.getFullYear()}`;
   };
 
   useEffect(() => {
-    if (!token) return navigate("/login");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setErrorMsg("");
 
     const fetchData = async () => {
       try {
+        // 1) read storedUser once here
+        let storedUser;
+        try {
+          storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+        } catch {
+          storedUser = {};
+        }
+
+        // 2) fetch user (self or other)
         const userUrl = isViewingOtherUser
-          ? `http://127.0.0.1:8000/api/auth/admin/users/${userId}/`
-          : `http://127.0.0.1:8000/api/auth/profile/`;
+          ? `${API_URL}/api/auth/admin/users/${userId}/`
+          : `${API_URL}/api/auth/profile/`;
 
         const userRes = await axios.get(userUrl, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setUser(userRes.data);
+        const fetchedUser = userRes.data;
+        setUser(fetchedUser);
 
+        // PLAN FLAGS:
+        // 1) prefer subscription on fetchedUser
+        // 2) fallback to local stored user
+
+        // 3) subscription / plan flags
+        let editFlag = false;
+        let passFlag = false;
+
+        if (fetchedUser?.subscription) {
+          editFlag = !!fetchedUser.subscription.can_edit_profile;
+          passFlag = !!fetchedUser.subscription.can_change_password;
+        } else if (storedUser?.subscription) {
+          editFlag = !!storedUser.subscription.can_edit_profile;
+          passFlag = !!storedUser.subscription.can_change_password;
+        }
+
+        setCanEditProfile(editFlag);
+        setCanChangePassword(passFlag);
+
+        // 4) address (only for self) – ignore errors
         if (!isViewingOtherUser) {
-          const addrRes = await axios.get(
-            "http://127.0.0.1:8000/api/addresses/",
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          if (Array.isArray(addrRes.data) && addrRes.data.length > 0) {
-            setAddress(addrRes.data[0]);
+          try {
+            const addrRes = await axios.get(`${API_URL}/api/addresses/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!cancelled) {
+              const arr = Array.isArray(addrRes.data) ? addrRes.data : [];
+              if (arr.length > 0) setAddress(arr[0]);
+            }
+          } catch (err) {
+            console.error("[ViewProfile] address fetch failed:", err);
+            // don't set global error, just skip address
           }
         }
 
-        const deptRes = await axios.get("http://127.0.0.1:8000/api/auth/departments/");
-        const rolesRes = await axios.get("http://127.0.0.1:8000/api/auth/roles/");
+        // 5) departments – with auth header
+        try {
+          const deptRes = await axios.get(`${API_URL}/api/auth/departments/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!cancelled) {
+            setDepartments(deptRes.data || []);
+          }
+        } catch (err) {
+          console.error("[ViewProfile] departments fetch failed:", err);
+        }
 
-        setDepartments(deptRes.data);
-        setRoles(rolesRes.data);
+        // 6) roles – with auth header
+        try {
+          const rolesRes = await axios.get(`${API_URL}/api/auth/roles/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!cancelled) {
+            setRoles(rolesRes.data || []);
+          }
+        } catch (err) {
+          console.error("[ViewProfile] roles fetch failed:", err);
+        }
 
+        if (!cancelled) {
+          setLoading(false);
+        }
       } catch (err) {
-        console.error("Error fetching profile:", err);
+        console.error("[ViewProfile] unexpected error:", err);
+        if (!cancelled) {
+          setErrorMsg("Something went wrong while loading profile.");
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [token, navigate, isViewingOtherUser, userId]);
 
-  const getDepartmentName = () => {
-    const dept = departments.find((d) => d.id === user.department);
-    return dept ? dept.department_name : "";
-  };
+const getDepartmentName = () => user.department_name || "";
+const getRoleName = () => user.role_name || "";
 
-  const getRoleName = () => {
-    const role = roles.find((r) => r.id === user.role);
-    return role ? role.role_name : "";
-  };
 
   const handleEdit = () => {
     if (isAdminLoggedIn) navigate("/admin/profile/edit");
@@ -85,22 +179,36 @@ function ViewProfile() {
 
   const handleBackToDashboard = () => navigate("/admin/dashboard");
 
+  if (!token) {
+    return null; // already redirected in effect
+  }
+
   return (
     <div className="view-profile-page">
+      {/* Simple loading & error banners */}
+      {loading && <p className="vp-loading">{/*loading....*/}</p>}
+      {!loading && errorMsg && <p className="vp-error">{errorMsg}</p>}
+
       <div className="view-profile-header">
         <h2>
-          {isViewingOtherUser ? `User Profile: ${user.username}` : "Your Profile"}
+          {isViewingOtherUser
+            ? `User Profile: ${user.username}`
+            : "Your Profile"}
         </h2>
 
         <div className="header-actions">
           {!isViewingOtherUser && (
             <>
-              <button className="edit-btn" onClick={handleEdit}>
-                Edit Details
-              </button>
-              <button className="pass-btn" onClick={handleChangePassword}>
-                Change Password
-              </button>
+              {(isAdminLoggedIn || canEditProfile) && (
+                <button className="edit-btn" onClick={handleEdit}>
+                  Edit Details
+                </button>
+              )}
+              {(isAdminLoggedIn || canChangePassword) && (
+                <button className="pass-btn" onClick={handleChangePassword}>
+                  Change Password
+                </button>
+              )}
             </>
           )}
         </div>

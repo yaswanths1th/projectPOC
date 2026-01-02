@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AddressPage.css";
+import { API_URL } from "../config/api";
 
 export default function AddressPage() {
   const navigate = useNavigate();
@@ -58,7 +59,7 @@ export default function AddressPage() {
           return;
         }
 
-        const res = await fetch("http://127.0.0.1:8000/api/auth/messages/");
+        const res = await fetch(`${API_URL}/api/auth/messages/`);
         const data = await res.json();
 
         localStorage.setItem("user_error", JSON.stringify(data.user_error));
@@ -110,7 +111,7 @@ export default function AddressPage() {
   useEffect(() => {
     const loadAddress = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/addresses/", {
+        const res = await fetch(`${API_URL}/api/addresses/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -249,8 +250,8 @@ export default function AddressPage() {
     if (!ok) return;
 
     const url = existingId
-      ? `http://127.0.0.1:8000/api/addresses/${existingId}/`
-      : "http://127.0.0.1:8000/api/addresses/";
+      ? `${API_URL}/api/addresses/${existingId}/`
+      : `${API_URL}/api/addresses/`;
 
     try {
       const res = await fetch(url, {

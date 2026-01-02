@@ -2,14 +2,15 @@
 
 /* ====== General Layout ====== */
 .edit-profile-page {
-  width: 90%;
-  max-width: 1000px;
-  margin: 50px auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   background: #f9fbff;
   border-radius: 16px;
-  padding: 35px;
+  padding: 24px 32px;
   font-family: "Poppins", sans-serif;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
 }
 
 /* ====== Header ====== */
@@ -86,9 +87,9 @@
 .edit-profile-card {
   background: #ffffff;
   border-radius: 12px;
-  padding: 30px 35px;
+  padding: 22px 26px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .edit-subsection-title {
@@ -207,4 +208,12 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.edit-form-grid {
+  gap: 16px 20px;
+}
+
+.edit-profile-header {
+  margin-bottom: 18px;
 }

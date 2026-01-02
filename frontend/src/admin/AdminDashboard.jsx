@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import "../layouts/AdminLayout.css";
 import "./AdminDashboard.css";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../config/api";
+
+
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -10,49 +13,60 @@ export default function AdminDashboard() {
     activeUsers: 0,
     holdUsers: 0,
   });
+
+  const [roleName, setRoleName] = useState("Admin");
+  const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [permissionMsg, setPermissionMsg] = useState("");
 
   const navigate = useNavigate();
 
-  const API = axios.create({
-    baseURL: "http://127.0.0.1:8000/api/",
-  });
+  // ----------------------------------------------------
+  // Get message from user_error table by code (EX001)
+  // ----------------------------------------------------
+  const getMessageByCode = (code) => {
+    if (!code) return "";
 
-  API.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-      const originalRequest = error.config;
+    try {
+      const ue = JSON.parse(localStorage.getItem("user_error") || "[]");
 
-      if (
-        error.response?.status === 401 &&
-        !originalRequest._retry &&
-        localStorage.getItem("refresh")
-      ) {
-        originalRequest._retry = true;
+      const msg = ue.find(
+        (m) => m?.error_code?.toUpperCase() === code.toUpperCase()
+      );
 
-        try {
-          const refreshToken = localStorage.getItem("refresh");
-          const res = await axios.post("http://127.0.0.1:8000/api/auth/token/refresh/", {
-            refresh: refreshToken,
-          });
-
-          localStorage.setItem("access", res.data.access);
-          API.defaults.headers.common["Authorization"] = `Bearer ${res.data.access}`;
-          originalRequest.headers["Authorization"] = `Bearer ${res.data.access}`;
-          return API(originalRequest);
-        } catch {
-          localStorage.removeItem("access");
-          localStorage.removeItem("refresh");
-          window.location.href = "/login";
-        }
-      }
-
-      return Promise.reject(error);
+      return msg?.error_message || code;
+    } catch {
+      return code;
     }
-  );
+  };
 
+
+  // ----------------------------------------------------
+  // On Load – Set role, permissions & stats
+  // ----------------------------------------------------
   useEffect(() => {
+  if (permissionMsg) {
+    const timer = setTimeout(() => {
+      setPermissionMsg("");
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }
+}, [permissionMsg]);
+
+
+
+
+  // ----------------------------------------------------
+  // On Load – Set role, permissions & stats
+  // ----------------------------------------------------
+  useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem("user") || "{}");
+
+    setRoleName(userData.role_name || "Admin");
+    setPermissions(userData.permissions || []);
+
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 10000);
     return () => clearInterval(interval);
@@ -65,9 +79,8 @@ export default function AdminDashboard() {
     try {
       const token = localStorage.getItem("access");
 
-      const res = await API.get("auth/admin/stats/", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get("/api/auth/admin/stats/");
+
 
       const data = res.data;
 
@@ -83,15 +96,24 @@ export default function AdminDashboard() {
     }
   };
 
-  const goToAll = () => navigate("/admin/users", { state: { statusFilter: "All Status" } });
-  const goToActive = () => navigate("/admin/users", { state: { statusFilter: "Active" } });
-  const goToHold = () => navigate("/admin/users", { state: { statusFilter: "Inactive" } });
+  // ----------------------------------------------------
+  // Card click handler
+  // ----------------------------------------------------
+  const handleUserNavigation = (filter) => {
+    if (!permissions.includes("view_manage_user")) {
+      const errMsg = getMessageByCode("EX001");
+      setPermissionMsg(errMsg);
+      return;
+    }
+
+    navigate("/admin/users", { state: { statusFilter: filter } });
+  };
 
   return (
     <div className="admin-dashboard-container">
       <section className="welcome-section">
-        <h1 className="welcome-text">Welcome To Admin Dashboard..!!</h1>
-        <p className="subtitle">Manage your platform and settings</p>
+        <h1 className="welcome-text">Welcome to {roleName} Dashboard..!!</h1>
+        <p className="subtitle">Manage your platform.</p>
       </section>
 
       <section className="stats-section">
@@ -103,31 +125,49 @@ export default function AdminDashboard() {
           <p className="error-text">{error}</p>
         ) : (
           <div className="stats-cards">
-            <div className="stat-card orange" onClick={goToAll} style={{ cursor: "pointer" }}>
+            <div
+              className="stat-card orange"
+              onClick={() => handleUserNavigation("All Status")}
+            >
               <div className="stat-info">
-                <h2>{stats.totalUsers}</h2>
+                <h2>{permissions.includes("view_manage_user") ? stats.totalUsers : "--"}</h2>
                 <p>Total Users</p>
               </div>
               <span className="badge orange">All</span>
             </div>
 
-            <div className="stat-card green" onClick={goToActive} style={{ cursor: "pointer" }}>
+            <div
+              className="stat-card green"
+              onClick={() => handleUserNavigation("Active")}
+            >
               <div className="stat-info">
-                <h2>{stats.activeUsers}</h2>
+                <h2>{permissions.includes("view_manage_user") ? stats.activeUsers : "--"}</h2>
                 <p>Active Users</p>
               </div>
               <span className="badge green">Active</span>
             </div>
 
-            <div className="stat-card blue" onClick={goToHold} style={{ cursor: "pointer" }}>
+            <div
+              className="stat-card blue"
+              onClick={() => handleUserNavigation("Inactive")}
+            >
               <div className="stat-info">
-                <h2>{stats.holdUsers}</h2>
+                <h2>{permissions.includes("view_manage_user") ? stats.holdUsers : "--"}</h2>
                 <p>Hold Users</p>
               </div>
               <span className="badge blue">On Hold</span>
             </div>
           </div>
         )}
+
+        {permissionMsg && (
+  <div style={{ textAlign: "center", marginTop: "20px" }}>
+    <p className="error-text" style={{ display: "inline-block", marginTop: "15px" }}>
+      {permissionMsg}
+    </p>
+  </div>
+)}
+
       </section>
     </div>
   );

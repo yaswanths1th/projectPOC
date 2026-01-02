@@ -1,8 +1,8 @@
 import { Navigate } from "react-router-dom";
 
-function AdminProtectedRoute({ children }) {
+export default function AdminProtectedRoute({ children }) {
   const token = localStorage.getItem("access");
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user") || "null");
 
   if (!token) return <Navigate to="/login" replace />;
 
@@ -14,6 +14,3 @@ function AdminProtectedRoute({ children }) {
 
   return children;
 }
-
-
-export default AdminProtectedRoute;

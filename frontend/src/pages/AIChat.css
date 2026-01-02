@@ -1,0 +1,502 @@
+/* ====== LAYOUT WRAPPER ====== */
+
+.ai-fullscreen-noscroll {
+  width: 100%;
+}
+
+.ai-main-noscroll {
+  padding: 16px 20px;
+}
+
+/* Sidebar + chat side-by-side */
+.ai-layout {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* ====== SIDEBAR ====== */
+
+.ai-sidebar {
+  width: 240px;
+  min-width: 220px;
+  background: #dde0e2;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  transition: max-height 220ms ease, padding 220ms ease;
+}
+
+.ai-sidebar.expanded {
+  /* desktop unaffected; this mainly aids mobile */
+}
+
+.ai-sidebar.collapsed {
+  /* default on desktop, but on mobile .collapsed will be applied and limit height */
+}
+
+.ai-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.ai-session-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+
+.ai-session-empty {
+  font-size: 13px;
+  color: #666;
+  padding: 8px;
+}
+
+.ai-session-item {
+  position: relative;
+  padding: 8px 26px 8px 8px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid transparent;
+}
+
+.ai-session-item:hover {
+  border-color: #00369133;
+  background: #eef2ff;
+}
+
+.active-session {
+  border-color: #003691;
+  background: #e0e7ff;
+}
+
+.ai-session-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0b2349;
+}
+
+.ai-session-meta {
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.ai-session-delete {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  color: #999;
+}
+
+.ai-session-delete:hover {
+  color: #c0392b;
+}
+
+.btn.btn-new-chat {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: #003691;
+  color: #fff;
+}
+
+/* mobile toggle - hidden on desktop */
+.mobile-toggle {
+  display: none;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  color: #0b2349;
+}
+
+/* ====== CHAT PANE ====== */
+
+.ai-chat-pane {
+  flex: 1;
+  background: #f9fbff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 14px 16px 0;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 140px);
+}
+
+.ai-main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.ai-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+
+.ai-sub {
+  font-size: 12px;
+  color: #666;
+}
+
+.ai-user-info {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Scrollable messages area */
+.ai-chat-area-noscroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 300px;
+  padding: 4px 4px 12px 0;
+  background-color: #e1e7f0;
+  border-radius: 12px;
+}
+
+/* Messages list */
+.messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ====== BUBBLES ====== */
+
+.message-row {
+  display: flex;
+  align-items: flex-end;
+}
+
+.user-row {
+  justify-content: flex-end;
+}
+
+.bot-row {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: 70%;
+  border-radius: 14px;
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.user-bubble {
+  background: #005a9c;
+  color: #fff;
+}
+
+.bot-bubble {
+  background: #f5f7fb;
+  color: #222;
+}
+
+.bot-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #003691;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+.bubble-time {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+/* ====== Markdown inside bot bubble (fix list numbers) ====== */
+
+.markdown-text p {
+  margin: 0 0 6px;
+}
+
+.markdown-text ol,
+.markdown-text ul {
+  margin: 0 0 6px 1.2rem;
+  padding-left: 1.1rem;
+}
+
+.markdown-text li {
+  margin-bottom: 3px;
+}
+
+/* ====== Composer at bottom ====== */
+
+.ai-composer-noscroll {
+  border-top: 1px solid #d8e0f0;
+  padding: 10px 0 14px;
+  margin-top: 6px;
+  background: #f9fbff;
+}
+
+
+.ai-input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #cfd8ea;
+  padding: 8px 10px;
+  font-size: 14px;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.ai-controls {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.controls-right {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  cursor: pointer;
+}
+
+.btn-clear {
+  border-radius: 8px;
+  border: 1px solid #ccd2e0;
+  background: #ffffff;
+  padding: 4px 12px;
+}
+
+.btn-send {
+  border-radius: 8px;
+  border: none;
+  padding: 4px 14px;
+  background: #003691;
+  color: #ffffff;
+}
+
+/* ====== Error text ====== */
+
+.ai-error {
+  color: #d32f2f;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+/* ====== Delete confirmation popup ====== */
+
+.popup-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.popup-box {
+  background: #ffffff;
+  padding: 20px 22px;
+  border-radius: 10px;
+  width: 320px;
+  max-width: 90%;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+
+.popup-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.btn-cancel {
+  flex: 1;
+  border: none;
+  background: #120101;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-delete {
+  flex: 1;
+  border: none;
+  background: #d9534f;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* =========================
+   MOBILE / RESPONSIVE FIXES
+   Adds targeted tweaks for narrow screens so sidebar
+   doesn't push chat off-screen and composer remains visible
+   ========================= */
+
+/* trigger mobile at 768px and below */
+@media (max-width: 768px) {
+  .ai-layout {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  /* show mobile toggle button inside sidebar header */
+  .mobile-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ai-sidebar {
+    width: 100%;
+    min-width: 0;
+    border-radius: 10px;
+    padding: 8px;
+    /* default collapsed state: show only header */
+    max-height: 48px;
+    overflow: hidden;
+  }
+
+  /* when expanded, allow the full sessions list to show */
+  .ai-sidebar.expanded {
+    max-height: 260px; /* shows header + session list */
+    overflow: hidden;
+  }
+
+  .ai-sidebar-header {
+    gap: 6px;
+    align-items: center;
+  }
+
+  .btn.btn-new-chat {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 20px;
+  }
+
+  .ai-session-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(260px - 48px);
+    -webkit-overflow-scrolling: touch;
+    padding-right: 6px;
+  }
+
+  .ai-session-item {
+    padding: 6px 10px 6px 8px;
+    margin-bottom: 6px;
+    border-radius: 8px;
+    font-size: 12px;
+  }
+
+  .ai-session-title {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 36px);
+  }
+
+  .ai-session-meta {
+    font-size: 10px;
+  }
+
+  .ai-session-delete {
+    right: 6px;
+    top: 6px;
+  }
+
+  .ai-chat-pane {
+    padding: 10px 12px 8px;
+    max-height: calc(100vh - 220px);
+  }
+
+  .ai-chat-area-noscroll {
+    min-height: 180px;
+    padding: 6px 2px 8px 0;
+  }
+
+  .ai-composer-noscroll {
+    padding: 8px 0 10px;
+  }
+
+  .ai-input {
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: 8px;
+  }
+
+  .msg-count {
+    display: none;
+  }
+
+  .bot-avatar {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+    margin-right: 6px;
+  }
+
+  .popup-box {
+    width: 90%;
+    padding: 16px;
+  }
+}
+
+/* VERY NARROW PHONES */
+@media (max-width: 420px) {
+  .ai-session-list {
+    max-height: 140px;
+  }
+
+  .ai-session-item {
+    padding-right: 32px;
+  }
+
+  .ai-chat-pane {
+    max-height: calc(100vh - 200px);
+  }
+
+  .ai-chat-area-noscroll {
+    min-height: 160px;
+  }
+}
+.btn-btn-send {
+  border-radius: 8px;
+  border: none;
+  padding: 4px 14px;
+  background: #003691;
+  color: #ffffff;
+}

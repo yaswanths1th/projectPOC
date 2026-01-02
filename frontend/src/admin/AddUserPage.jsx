@@ -3,28 +3,19 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./AddUserPage.css";
+import TenantUpgradeModal from "./components/TenantUpgradeModal";
 
-/**
- * Merged AddUserPage
- * - Project B layout kept
- * - Project A validation + cached messages + postal lookup + live uniqueness checks
- *
- * Endpoints expected:
- *  POST /api/auth/admin/users/           (create user)
- *  POST /api/addresses/                  (create address)
- *  GET  /api/auth/departments/
- *  GET  /api/auth/roles/
- *  GET  /api/auth/check-username/?username=...
- *  GET  /api/auth/check-email/?email=...
- *  GET  /api/auth/messages/              (full tables)   [optional: cached]
- *  GET  /api/auth/messages/error/{code}/ (single-code fallback)
- *  GET  /api/auth/messages/validation/{code}/
- *  GET  /api/auth/messages/information/{code}/
- */
-
+import { API_URL } from "../config/api";
 function AddUserPage() {
   const navigate = useNavigate();
   const token = localStorage.getItem("access");
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+// Logged-in admin (tenant context)
+  const [loggedUser, setLoggedUser] = useState(
+    JSON.parse(localStorage.getItem("user") || "{}")
+  );
+  const currentPlan = loggedUser?.subscription?.slug || "free";
 
   const [user, setUser] = useState({
     username: "",
@@ -81,7 +72,7 @@ function AddUserPage() {
       const cached = localStorage.getItem(`${type}_${code}`);
       if (cached) return cached;
       // fallback single-code API
-      const url = `http://127.0.0.1:8000/api/auth/messages/${type}/${code}/`;
+      const url = `${API_URL}/api/auth/messages/${type}/${code}/`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -122,42 +113,30 @@ function AddUserPage() {
   // ---------------------------
   // Load message tables from localStorage only first; if empty try full fetch (best-effort)
   // ---------------------------
-  useEffect(() => {
-    const loadTables = async () => {
-      try {
-        const e = JSON.parse(localStorage.getItem("user_error") || "[]");
-        const v = JSON.parse(localStorage.getItem("user_validation") || "[]");
-        const i = JSON.parse(localStorage.getItem("user_information") || "[]");
+useEffect(() => {
+  const load = async () => {
+    try {
+      const headers = token
+        ? { Authorization: `Bearer ${token}` }
+        : {};
 
-        if ((Array.isArray(e) && e.length) || (Array.isArray(v) && v.length) || (Array.isArray(i) && i.length)) {
-          setTables({
-            user_error: Array.isArray(e) ? e : [],
-            user_validation: Array.isArray(v) ? v : [],
-            user_information: Array.isArray(i) ? i : [],
-          });
-          return;
-        }
+      const [d, r] = await Promise.all([
+        axios.get(`${API_URL}/api/auth/departments/`, { headers }),
+        axios.get(`${API_URL}/api/auth/roles/`, { headers }),
+      ]);
 
-        // Best-effort fetch to populate cache for first-time installs
-        const res = await fetch("http://127.0.0.1:8000/api/auth/messages/");
-        if (res.ok) {
-          const data = await res.json();
-          const ue = Array.isArray(data.user_error) ? data.user_error : [];
-          const uv = Array.isArray(data.user_validation) ? data.user_validation : [];
-          const ui = Array.isArray(data.user_information) ? data.user_information : [];
-          setTables({ user_error: ue, user_validation: uv, user_information: ui });
-          localStorage.setItem("user_error", JSON.stringify(ue));
-          localStorage.setItem("user_validation", JSON.stringify(uv));
-          localStorage.setItem("user_information", JSON.stringify(ui));
-        } else {
-          setTables({ user_error: [], user_validation: [], user_information: [] });
-        }
-      } catch {
-        setTables({ user_error: [], user_validation: [], user_information: [] });
-      }
-    };
-    loadTables();
-  }, []);
+      setDepartments(Array.isArray(d.data) ? d.data : []);
+      setRoles(Array.isArray(r.data) ? r.data : []);
+    } catch (err) {
+      console.error("Failed loading departments/roles", err);
+      setDepartments([]);
+      setRoles([]);
+    }
+  };
+
+  load();
+}, [token]);
+
 
   // ---------------------------
   // Load dropdowns
@@ -165,8 +144,8 @@ function AddUserPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const d = await axios.get("http://127.0.0.1:8000/api/auth/departments/");
-        const r = await axios.get("http://127.0.0.1:8000/api/auth/roles/");
+        const d = await axios.get(`${API_URL}/api/auth/departments/`);
+        const r = await axios.get(`${API_URL}/api/auth/roles/`);
         setDepartments(Array.isArray(d.data) ? d.data : []);
         setRoles(Array.isArray(r.data) ? r.data : []);
       } catch {
@@ -178,10 +157,22 @@ function AddUserPage() {
 
   // filter roles when department changes
   useEffect(() => {
-    if (user.department) {
-      const r = roles.filter((x) => Number(x.department) === Number(user.department));
-      setFilteredRoles(r);
-    } else setFilteredRoles([]);
+    if (!user.department) {
+      setFilteredRoles([]);
+      setUser((p) => ({ ...p, role: "" }));
+      return;
+    }
+
+    const deptRoles = roles.filter(
+      (r) => Number(r.department) === Number(user.department)
+    );
+
+    setFilteredRoles(deptRoles);
+
+    // 🚨 CRITICAL: reset role if invalid
+    if (!deptRoles.some((r) => Number(r.id) === Number(user.role))) {
+      setUser((p) => ({ ...p, role: "" }));
+    }
   }, [user.department, roles]);
 
   // ---------------------------
@@ -296,7 +287,7 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
   const checkUsernameUnique = async (usernameVal) => {
     if (!usernameVal || !USERNAME_RE.test(usernameVal)) return;
     try {
-      const res = await axios.get("http://127.0.0.1:8000/api/auth/check-username/", {
+      const res = await axios.get(`${API_URL}/api/auth/check-username/`, {
         params: { username: usernameVal },
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -315,7 +306,7 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
   const checkEmailUnique = async (emailVal) => {
     if (!emailVal || !EMAIL_RE.test(emailVal)) return;
     try {
-      const res = await axios.get("http://127.0.0.1:8000/api/auth/check-email/", {
+      const res = await axios.get(`${API_URL}/api/auth/check-email/`, {
         params: { email: emailVal },
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -388,6 +379,18 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
   const handleSave = async () => {
     setSaving(true);
     setErrors({});
+    if (!user.department) {
+      setErrors((p) => ({ ...p, department: "Department is required" }));
+      setSaving(false);
+      return;
+    }
+
+    if (!user.role) {
+      setErrors((p) => ({ ...p, role: "Role is required" }));
+      setSaving(false);
+      return;
+    }
+
     // client-side validation first
     const ok = await validateAll();
     if (!ok) {
@@ -400,7 +403,7 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
     try {
       // create user
       const res = await axios.post(
-        "http://127.0.0.1:8000/api/auth/admin/users/",
+        `${API_URL}/api/auth/admin/users/`,
         { ...user, department: user.department ? Number(user.department) : null, role: user.role ? Number(user.role) : null },
         { headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
@@ -412,7 +415,7 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
       const hasAddress = Object.values(address).some((v) => v && String(v).trim());
       if (hasAddress && userId) {
         await axios.post(
-          "http://127.0.0.1:8000/api/addresses/",
+          `${API_URL}/api/addresses/`,
           { ...address, user: userId },
           { headers: token ? { Authorization: `Bearer ${token}` } : {} }
         );
@@ -424,9 +427,31 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
       // redirect after 1.2s so user sees toast
       setTimeout(() => navigate("/admin/users"), 1200);
     } catch (err) {
-      // Map backend errors to field messages using cached codes when possible
       const resp = err.response?.data;
+
+      // 🔥 USER LIMIT HANDLING (HIGHEST PRIORITY)
+// 🔥 USER LIMIT HANDLING (HIGHEST PRIORITY)
+    if (resp?.code === "RESOURCE_LIMIT_REACHED") {
+
+  setSaving(false); // ✅ ADD THIS
+
+  // If NOT tenant admin → block
+  if (!loggedUser?.is_tenant_admin) {
+    showToast(
+      "User limit reached. Contact your tenant administrator.",
+      "error"
+    );
+    return;
+  }
+
+  // Tenant admin → allow upgrade
+  setShowUpgradeModal(true);
+  return;
+}
+
+
       const newErrs = {};
+
 
       if (resp && typeof resp === "object") {
         for (const key of Object.keys(resp)) {
@@ -457,11 +482,21 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
         }
 
         // if no field errors but top-level detail is present
-        if (!Object.keys(newErrs).length && typeof resp.detail === "string") {
-          const det = String(resp.detail).trim();
-          const codeItem = (tables.user_error || []).find((it) => String(it?.error_code || "").toUpperCase() === det.toUpperCase());
-          newErrs.general = codeItem ? codeItem.error_message : det;
-        }
+// Handle USER LIMIT & other general errors
+      if (resp?.detail) {
+        const msg = Array.isArray(resp.detail)
+          ? resp.detail[0]
+          : String(resp.detail);
+
+        newErrs.general = msg;
+      }
+
+      // Handle error codes (optional badge/logging)
+      if (resp?.code) {
+        const code = Array.isArray(resp.code) ? resp.code[0] : resp.code;
+        console.warn("Backend error code:", code);
+      }
+
       } else if (typeof resp === "string") {
         const det = resp.trim();
         const codeItem = (tables.user_error || []).find((it) => String(it?.error_code || "").toUpperCase() === det.toUpperCase());
@@ -615,6 +650,31 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
         </div>
       </div>
 
+
+     <TenantUpgradeModal
+  open={showUpgradeModal}
+  currentPlan={currentPlan}
+  onClose={() => {
+    setShowUpgradeModal(false);
+  }}
+  onUpgraded={async () => {
+    setShowUpgradeModal(false);
+
+    // 🔁 refresh user profile
+   const profile = await axios.get(
+  `${API_URL}/api/auth/profile/`,
+  { headers: { Authorization: `Bearer ${token}` } }
+);
+
+localStorage.setItem("user", JSON.stringify(profile.data));
+setLoggedUser(profile.data); // ✅ ADD THIS
+
+handleSave();
+ // retry after fresh subscription
+  }}
+/>
+
+
       {/* Address */}
       <div className="add-user-card">
         <h3>Address</h3>
@@ -667,18 +727,32 @@ else if ((name === "first_name" || name === "last_name") && !NAME_RE.test(v)) {
 
       {/* ACTIONS */}
       <div className="action-buttons">
-        <button className="save-btn" onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save User"}
-        </button>
-        <button className="cancel-btn" onClick={() => navigate("/admin/users")}>
-          Cancel
-        </button>
-      </div>
+  <button
+    className="save-btn"
+    onClick={handleSave}
+    disabled={saving || showUpgradeModal}
+  >
+    {saving ? "Saving..." : "Save User"}
+  </button>
+
+  {/* 🔥 Upgrade Plan button */}
+  <button
+    type="button"
+    className="upgrade-btn"
+    onClick={() => navigate("/admin/billing")}
+  >
+    Upgrade Plan
+  </button>
+</div>
+
 
       {/* Bottom general error */}
       {errors.general && <div style={{ marginTop: 12 }} className="alert-box alert-error">{errors.general}</div>}
     </div>
+    
   );
+  
 }
+
 
 export default AddUserPage;

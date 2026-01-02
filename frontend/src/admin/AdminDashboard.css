@@ -128,3 +128,12 @@
     text-align: left;
   }
 }
+
+.error-text {
+  color: #ff4d4d;
+  background: rgba(255, 77, 77, 0.1);
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+

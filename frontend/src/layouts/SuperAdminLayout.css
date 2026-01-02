@@ -1,0 +1,87 @@
+:root {
+  --sa-bg: #0b2349;
+  --sa-bg-light: #f8f9fa;
+  --sa-primary: #1f2796;
+  --sa-text: #ffffff;
+  --sa-muted: #c7d2fe;
+}
+
+/* Layout */
+.sa-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--sa-bg-light);
+}
+
+/* Sidebar */
+.sa-sidebar {
+  width: 240px;
+  background: var(--sa-bg);
+  color: var(--sa-text);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+}
+
+/* Logo */
+.sa-logo {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 30px;
+  text-align: center;
+  color: #ffffff;
+}
+
+/* Navigation */
+.sa-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sa-link {
+  display: block;
+  padding: 10px 14px;
+  color: #dce3ff;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.sa-link:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sa-link.active {
+  background: #314a7d;
+  color: #ffffff;
+}
+
+
+/* Logout */
+.sa-logout {
+  margin-top: auto;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: #ff4d4d;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sa-logout:hover {
+  background: #e63b3b;
+}
+
+/* Content */
+.sa-content {
+  margin-left: 240px;
+  padding: 24px;
+  width: 100%;
+}

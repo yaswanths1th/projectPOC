@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "./ForgotPassword.css";
+import { API_URL } from "../config/api";
 
 const FALLBACK = {
   SUCCESS: "IFP001", // Code sent successfully
@@ -76,7 +77,7 @@ export default function ForgotPassword() {
 
     try {
       const res = await axios.post(
-        "http://127.0.0.1:8000/api/password-reset/send-otp/",
+        `${API_URL}/api/password-reset/send-otp/`,
         { email }
       );
 

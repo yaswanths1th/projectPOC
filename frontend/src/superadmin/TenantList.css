@@ -1,0 +1,221 @@
+:root {
+  --orange: #1f2796;
+  --blue: #007bff;
+  --green: #27ae60;
+  --red: #d32f2f;
+  --bg-light: #f8f9fa;
+  --text-dark: #222;
+  --text-gray: #666;
+  --border-light: #e5e7eb;
+}
+
+/* ---------- Page ---------- */
+.sa-tenants-page {
+  padding: 2rem;
+  background: var(--bg-light);
+  min-height: 100vh;
+  font-family: "Lato", sans-serif;
+}
+
+/* ---------- Header ---------- */
+.sa-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.sa-header h2 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--orange);
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border-light);
+  background: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn.primary {
+  background: var(--orange);
+  color: #fff;
+  border-color: var(--orange);
+}
+
+.btn.primary:hover {
+  opacity: 0.9;
+}
+
+.btn.danger {
+  background: rgba(211, 47, 47, 0.1);
+  border-color: rgba(211, 47, 47, 0.3);
+  color: var(--red);
+}
+
+.btn.danger:hover {
+  background: rgba(211, 47, 47, 0.15);
+}
+
+/* ---------- Loading / Error ---------- */
+.loading,
+.error {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-gray);
+  font-size: 0.95rem;
+}
+
+.error {
+  color: var(--red);
+}
+
+/* ---------- Tenant Grid ---------- */
+.tenant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+/* ---------- Tenant Card ---------- */
+.tenant-card {
+  background: #fff;
+  padding: 1.2rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.tenant-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* ---------- Card Header ---------- */
+.tenant-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tenant-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-dark);
+}
+
+.tenant-slug {
+  font-size: 0.8rem;
+  color: var(--text-gray);
+}
+
+/* ---------- Meta ---------- */
+.tenant-meta {
+  font-size: 0.75rem;
+  color: var(--text-gray);
+}
+
+/* ---------- Status Badge ---------- */
+.tenant-status {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.tenant-status.active {
+  background: rgba(39, 174, 96, 0.1);
+  color: var(--green);
+}
+
+.tenant-status.inactive {
+  background: rgba(211, 47, 47, 0.1);
+  color: var(--red);
+}
+
+/* ---------- Actions ---------- */
+.tenant-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+/* ---------- Modal ---------- */
+.sa-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.sa-modal-inner {
+  width: 420px;
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.2);
+}
+
+.sa-modal-inner h3 {
+  margin-bottom: 1rem;
+  color: var(--orange);
+}
+
+.sa-modal-inner label {
+  display: block;
+  margin-bottom: 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.sa-modal-inner input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  margin-top: 6px;
+  font-size: 0.9rem;
+}
+
+.sa-modal-inner input:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+
+/* ---------- Modal Actions ---------- */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 600px) {
+  .sa-tenants-page {
+    padding: 1rem;
+  }
+
+  .sa-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.8rem;
+  }
+}

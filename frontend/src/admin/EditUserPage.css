@@ -91,3 +91,31 @@
   border: 1px solid #86efac;
   color: #166534;
 }
+.display-field {
+  padding: 10px 14px;
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #111827;
+  cursor: default;
+  user-select: none;
+}
+.readonly-display {
+  background: #f1f1f1;
+  color: #444;
+  border: 1px solid #ddd;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: default;
+  width: 100%;
+}
+.readonly-locked {
+  background: #f1f1f1;
+  color: #444;
+  border: 1px solid #ddd;
+  padding: 10px 12px;
+  border-radius: 8px;
+  width: 100%;
+  cursor: not-allowed;      /* shows ⛔ red circle */
+}

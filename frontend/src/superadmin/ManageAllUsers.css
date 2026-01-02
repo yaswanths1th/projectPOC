@@ -1,0 +1,111 @@
+/* Root theme (reuse across admin) */
+:root {
+  --primary: #1f2796;
+  --blue: #007bff;
+  --green: #27ae60;
+  --red: #e74c3c;
+  --bg-light: #f8f9fa;
+  --text-dark: #222;
+  --text-gray: #666;
+  --border: #e5e7eb;
+}
+
+/* Page container */
+.all-users-page {
+  padding: 2rem;
+  background: var(--bg-light);
+  min-height: 100vh;
+  font-family: "Lato", sans-serif;
+}
+
+/* Header */
+.all-users-header {
+  margin-bottom: 1.5rem;
+}
+
+.all-users-header h2 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* Table wrapper */
+.users-table-wrapper {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  overflow-x: auto;
+}
+
+/* Table */
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Table head */
+.users-table thead {
+  background: #f1f3f9;
+}
+
+.users-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Table body */
+.users-table td {
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Row hover */
+.users-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+/* Status badge */
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  display: inline-block;
+}
+
+.status-active {
+  background: var(--green);
+}
+
+.status-inactive {
+  background: var(--red);
+}
+
+/* Empty / loading */
+.users-loading {
+  padding: 40px;
+  text-align: center;
+  font-size: 1rem;
+  color: var(--text-gray);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .all-users-page {
+    padding: 1rem;
+  }
+
+  .users-table th,
+  .users-table td {
+    padding: 10px;
+    font-size: 0.8rem;
+  }
+}

@@ -199,3 +199,17 @@
   color: #dc2626;
   margin-top: -6px;
 }
+
+.upgrade-btn {
+  background: #fff;
+  color: #0b2349;
+  border: 1px solid #0b2349;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.upgrade-btn:hover {
+  background: #0b2349;
+  color: #fff;
+}

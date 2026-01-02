@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import "./VerifyOtp.css";
+import { API_URL } from "../config/api";
 
 export default function VerifyOtp() {
   const location = useLocation();
@@ -137,7 +138,7 @@ export default function VerifyOtp() {
     setLoading(true);
     try {
       const res = await axios.post(
-        "http://127.0.0.1:8000/api/password-reset/verify-otp/",
+        `${API_URL}/api/password-reset/verify-otp/`,
         form
       );
 

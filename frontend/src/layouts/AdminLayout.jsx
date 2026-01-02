@@ -5,51 +5,53 @@ import {
   Users,
   BarChart2,
   Settings,
+  CreditCard,
   LogOut,
+  Menu,          // 🔹 hamburger icon
 } from "lucide-react";
+
 import "./AdminLayout.css";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
+
   const [adminName, setAdminName] = useState("Admin");
+  const [panelName, setPanelName] = useState("Admin");
+  const [permissions, setPermissions] = useState([]);
   const [initial, setInitial] = useState("A");
   const [avatarColor, setAvatarColor] = useState("#0b2349");
+  const [userData, setUserData] = useState(null);
+  const [isTenantAdmin, setIsTenantAdmin] = useState(false);
+
+useEffect(() => {
   const token = localStorage.getItem("access");
+  if (!token) {
+    navigate("/login");
+    return;
+  }
 
-  useEffect(() => {
-    if (!token) {
-      navigate("/login");
-      return;
-    }
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
 
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/auth/profile/", {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
+  setUserData(storedUser);
+  setIsTenantAdmin(!!storedUser.is_tenant_admin);
 
-        if (!res.ok) throw new Error("Failed to fetch profile");
-        const data = await res.json();
+  const name =
+    storedUser.username ||
+    `${storedUser.first_name || ""} ${storedUser.last_name || ""}`.trim() ||
+    "Admin";
 
-        const name =
-          data.first_name || data.last_name
-            ? `${data.first_name || ""} ${data.last_name || ""}`.trim()
-            : data.username || "Admin";
+  setAdminName(name);
+  setPanelName(storedUser.role_name || "Admin");
+  setPermissions(storedUser.permissions || []);
 
-        setAdminName(name);
-        const first = name.charAt(0).toUpperCase();
-        setInitial(first);
-        setAvatarColor(generateColor(first));
-      } catch (err) {
-        console.error("Profile fetch error:", err);
-      }
-    };
+  const first = name.charAt(0).toUpperCase();
+  setInitial(first);
+  setAvatarColor(generateColor(first));
+}, [navigate]);
 
-    fetchProfile();
-  }, [token, navigate]);
+
+  // Permission checker
+  const has = (p) => permissions.includes(p);
 
   const generateColor = (char) => {
     const colors = [
@@ -67,46 +69,92 @@ export default function AdminLayout() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("access");
-    localStorage.removeItem("refresh");
-    localStorage.removeItem("user");
+    localStorage.clear();
     navigate("/login");
   };
+
+  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
+  const closeSidebar = () => setSidebarOpen(false);
 
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
-        <h2 className="sidebar-title">Admin Panel</h2>
+
+        {/* 🔥 DYNAMIC PANEL NAME */}
+        <h2 className="sidebar-title">{panelName} Panel</h2>
 
         <nav className="sidebar-nav">
-          <NavLink to="/admin/dashboard"
+          {/* ALWAYS VISIBLE */}
+          <NavLink
+            to="/admin/dashboard"
             className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
           >
             <LayoutDashboard size={18} /> Dashboard
           </NavLink>
 
-          <NavLink to="/admin/users"
-            className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
-          >
-            <Users size={18} /> Manage Users
-          </NavLink>
+          {/* MANAGE USERS */}
+          {has("view_manage_user") && (
+  <NavLink
+    to="/admin/users"
+    className={({ isActive }) =>
+      isActive ? "nav-link active" : "nav-link"
+    }
+  >
+    <Users size={18} /> Manage Users
+  </NavLink>
+)}
 
-          <NavLink to="/admin/reports"
-            className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
-          >
-            <BarChart2 size={18} /> Reports
-          </NavLink>
+{/* PLANS & BILLING (Tenant Admin only) */}
+{isTenantAdmin && (
+  <NavLink
+    to="/admin/billing"
+    className={({ isActive }) =>
+      isActive ? "nav-link active" : "nav-link"
+    }
+  >
+    <CreditCard size={18} /> Plans & Billing
+  </NavLink>
+)}
 
-          <NavLink to="/admin/settings"
-            className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
-          >
-            <Settings size={18} /> Settings
-          </NavLink>
+
+
+
+          {/* REPORTS */}
+          {has("view_reports") ? (
+            <NavLink
+              to="/admin/reports"
+              className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
+            >
+              <BarChart2 size={18} /> Reports
+            </NavLink>
+          ) : null}
+
+          {/* SETTINGS */}
+          {has("view_settings") ||
+          has("manage_roles") ||
+          has("manage_departments") ? (
+            <NavLink
+              to="/admin/settings"
+              className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
+            >
+              <Settings size={18} /> Settings
+            </NavLink>
+          ) : null}
         </nav>
       </aside>
 
+      {/* 🔹 Main wrapper */}
       <div className="admin-main-wrapper">
         <header className="admin-header">
+          {/* Hamburger button (visible on mobile via CSS) */}
+          <button
+            className="header-menu-btn"
+            onClick={toggleSidebar}
+            aria-label="Toggle menu"
+          >
+            <Menu size={22} />
+          </button>
+
           <span className="header-title">Welcome, {adminName}</span>
 
           <div

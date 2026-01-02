@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./AdminSettings.css";
+import { API_URL } from "../config/api";
+
 
 export default function AdminSettings() {
   const token = localStorage.getItem("access");
 
   const API = axios.create({
-    baseURL: "http://127.0.0.1:8000/api/auth/",
+    baseURL: `${API_URL}/api/auth/`,
     headers: { Authorization: `Bearer ${token}` },
   });
 

@@ -1,10 +1,13 @@
 // ✅ frontend/src/utils/messageloader.js
+
+// remove cheyochu emi parledhu
+import { API_URL } from "../config/api";
 export async function loadMessages() {
   try {
     // ✅ Always refresh messages (remove old cache)
     localStorage.removeItem("messages_loaded");
 
-    const res = await fetch("http://127.0.0.1:8000/api/auth/messages/");
+    const res = await fetch(`${API_URL}/api/auth/messages/`);
     if (!res.ok) throw new Error("Failed to fetch message tables");
 
     const data = await res.json();

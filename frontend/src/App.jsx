@@ -1,5 +1,8 @@
+// src/App.jsx
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -24,98 +27,158 @@ import AdminProtectedRoute from "./components/AdminProtectedRoute";
 
 import UserLayout from "./layouts/UserLayout";
 
-// 👉 Make sure filename matches exactly
-import { loadMessages } from "./utils/messageloader";
+import PlansPage from "./pages/PlansPage";
+import AIChat from "./pages/AIChat";
+import BillingPage from "./pages/BillingPage";
+
+import LandingPage from "./pages/LandingPage";
+import AdminBillingPage from "./admin/AdminBillingPage";
+
+import SuperAdminProtectedRoute from "./components/SuperAdminProtectedRoute";
+import SuperAdminLayout from "./layouts/SuperAdminLayout";
+import SuperAdminDashboard from "./superadmin/SuperAdminDashboard";
+import TenantList from "./superadmin/TenantList";
+import ManageAllUsers from "./superadmin/ManageAllUsers";
+import SuperAdminReports from "./superadmin/SuperAdminReports";
+import TenantReportPage from "./superadmin/TenantReportPage";
 
 function App() {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
-  const [msgsReady, setMsgsReady] = useState(false);
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  });
 
+  // Sync user across tabs / logout
   useEffect(() => {
-    const init = async () => {
-      await loadMessages();
-      setMsgsReady(true);
+    const handleStorage = (e) => {
+      if (e.key === "user") {
+        try {
+          setUser(JSON.parse(e.newValue || "null"));
+        } catch {
+          setUser(null);
+        }
+      }
     };
-    init();
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  if (!msgsReady) {
-    return (
-      <div style={{
-        width: "100%",
-        height: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "22px"
-      }}>
-        Loading...
-      </div>
-    );
-  }
+  // -----------------------------------------
+  // DEFAULT ROUTE BASED ON USER TYPE
+  // -----------------------------------------
+  const getDefaultRoute = () => {
+    if (!user) return "/login";
 
-const getDefaultRoute = () => {
-  if (!user) return "/login";
+    if (user.is_superadmin) return "/superadmin/dashboard";
 
-  const roleId = Number(user.role_id);
+    if (
+      user.is_tenant_admin ||
+      user.permissions?.includes("view_manage_user")
+    ) {
+      return "/admin/dashboard";
+    }
 
-  if (!isNaN(roleId) && roleId !== 2) {
-    return "/admin/dashboard";  // admin
-  }
-  return "/dashboard"; // user
-};
-
+    return "/dashboard";
+  };
 
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to={getDefaultRoute()} />} />
+    <>
+      <ToastContainer />
 
-      {/* Public */}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/verify-otp" element={<VerifyOtp />} />
+      <Routes>
+        {/* Root */}
+        <Route
+          path="/"
+          element={user ? <Navigate to={getDefaultRoute()} /> : <LandingPage />}
+        />
 
-      {/* User routes */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <UserLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="profile" element={<ViewProfile />} />
-        <Route path="addresses" element={<AddressPage />} />
-        <Route path="edit-profile" element={<EditProfilePage isAdminRoute={false} />} />
-        <Route path="change-password" element={<ChangePassword />} />
-      </Route>
+        {/* Public auth routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/verify-otp" element={<VerifyOtp />} />
 
-      {/* Admin routes */}
-      <Route
-        path="/admin"
-        element={
-          <AdminProtectedRoute>
-            <AdminLayout />
-          </AdminProtectedRoute>
-        }
-      >
-        <Route path="dashboard" element={<AdminDashboard />} />
-        <Route path="users" element={<ManageUsers />} />
-        <Route path="users/add" element={<AddUserPage />} />
-        <Route path="users/edit/:id" element={<EditUserPage />} />
-        <Route path="users/:userId" element={<ViewProfile />} />
-        <Route path="profile" element={<ViewProfile />} />
-        <Route path="profile/edit" element={<EditProfilePage isAdminRoute={true} />} />
-        <Route path="change-password" element={<ChangePassword />} />
-        <Route path="reports" element={<Reports />} />
-        <Route path="settings" element={<AdminSettings />} />
-      </Route>
+        {/* ---------- USER ROUTES ---------- */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <UserLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="profile" element={<ViewProfile />} />
+          <Route path="addresses" element={<AddressPage />} />
+          <Route
+            path="edit-profile"
+            element={<EditProfilePage isAdminRoute={false} />}
+          />
+          <Route path="change-password" element={<ChangePassword />} />
+          <Route path="account/plans" element={<PlansPage />} />
+          <Route path="account/ai" element={<AIChat />} />
+          <Route path="billing" element={<BillingPage />} />
+        </Route>
 
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to={getDefaultRoute()} />} />
-    </Routes>
+        {/* ---------- ADMIN ROUTES ---------- */}
+        <Route
+          path="/admin"
+          element={
+            <AdminProtectedRoute>
+              <AdminLayout />
+            </AdminProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="users" element={<ManageUsers />} />
+          <Route path="users/add" element={<AddUserPage />} />
+          <Route path="users/edit/:id" element={<EditUserPage />} />
+          <Route path="users/:userId" element={<ViewProfile />} />
+          <Route path="profile" element={<ViewProfile />} />
+          <Route
+            path="profile/edit"
+            element={<EditProfilePage isAdminRoute={true} />}
+          />
+          <Route path="change-password" element={<ChangePassword />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="settings" element={<AdminSettings />} />
+        </Route>
+
+        {/* ---------- SUPERADMIN ROUTES ---------- */}
+        <Route
+          path="/superadmin"
+          element={
+            <SuperAdminProtectedRoute>
+              <SuperAdminLayout />
+            </SuperAdminProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<SuperAdminDashboard />} />
+          <Route path="tenants" element={<TenantList />} />
+          <Route path="users" element={<ManageAllUsers />} />
+          <Route path="reports" element={<SuperAdminReports />} />
+          <Route path="reports/:tenantId" element={<TenantReportPage />} />
+        </Route>
+
+        {/* Admin billing */}
+        <Route
+          path="/admin/billing"
+          element={
+            <AdminProtectedRoute>
+              <AdminLayout />
+            </AdminProtectedRoute>
+          }
+        >
+          <Route index element={<AdminBillingPage />} />
+        </Route>
+
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to={getDefaultRoute()} />} />
+      </Routes>
+    </>
   );
 }
 

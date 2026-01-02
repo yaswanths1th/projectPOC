@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./EditProfilePage.css";
+import { API_URL } from "../config/api";
 
 // ==============================
 //  EDIT PROFILE PAGE
@@ -48,7 +49,7 @@ export default function EditProfilePage() {
       if (cached) return cached;
 
       const res = await fetch(
-        `http://127.0.0.1:8000/api/auth/messages/${type}/${code}/`
+        `${API_URL}/api/auth/messages/${type}/${code}/`
       );
       if (res.ok) {
         const data = await res.json();
@@ -110,7 +111,7 @@ export default function EditProfilePage() {
           });
         } else {
           const res = await fetch(
-            "http://127.0.0.1:8000/api/auth/messages/"
+            `${API_URL}/api/auth/messages/`
           );
           if (res.ok) {
             const data = await res.json();
@@ -144,14 +145,14 @@ export default function EditProfilePage() {
     const loadAll = async () => {
       try {
         const userRes = await axios.get(
-          "http://127.0.0.1:8000/api/auth/profile/",
+          `${API_URL}/api/auth/profile/`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setUser(userRes.data);
 
         // address
         const addrRes = await axios.get(
-          "http://127.0.0.1:8000/api/addresses/",
+          `${API_URL}/api/addresses/`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -162,10 +163,10 @@ export default function EditProfilePage() {
 
         // departments + roles
         const deptRes = await axios.get(
-          "http://127.0.0.1:8000/api/auth/departments/"
+          `${API_URL}/api/auth/departments/`
         );
         const rolesRes = await axios.get(
-          "http://127.0.0.1:8000/api/auth/roles/"
+          `${API_URL}/api/auth/roles/`
         );
 
         setDepartments(deptRes.data || []);
@@ -366,80 +367,68 @@ export default function EditProfilePage() {
   };
 
   // ------------------ SAVE ------------------
-  const handleSave = async () => {
-    setSuccessMsg("");
-    setErrors({});
-    if (!(await validateAll())) return;
+const handleSave = async () => {
+  setSuccessMsg("");
+  setErrors({});
 
-    setSaving(true);
-    try {
-      let payload = { ...user };
-      if (payload.department)
-        payload.department = Number(payload.department);
-      if (payload.role)
-        payload.role = Number(payload.role);
+  if (!(await validateAll())) return;
 
-      await axios.put("http://127.0.0.1:8000/api/auth/profile/", payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+  setSaving(true);
+  try {
+    // ✅ ONLY editable fields
+    const profilePayload = {
+      first_name: user.first_name || "",
+      last_name: user.last_name || "",
+      username: user.username || "",
+      email: user.email || "",
+      phone: user.phone || "",
+    };
 
-      // address
-      const addrUrl = address.id
-        ? `http://127.0.0.1:8000/api/addresses/${address.id}/`
-        : "http://127.0.0.1:8000/api/addresses/";
+    // ✅ PATCH profile
+    await axios.patch(
+      `${API_URL}/api/auth/profile/`,
+      profilePayload,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-      await axios({
-        method: address.id ? "put" : "post",
-        url: addrUrl,
-        data: address,
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    // ✅ Save address
+    const addrUrl = address.id
+      ? `${API_URL}/api/addresses/${address.id}/`
+      : `${API_URL}/api/addresses/`;
 
-      const msg = await getInfoText(address.id ? "IA004" : "IA001");
-      setSuccessMsg(msg);
+    await axios({
+      method: address.id ? "put" : "post",
+      url: addrUrl,
+      data: address,
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      setTimeout(() => navigate(redirectTo), 1200);
-    } catch (err) {
-      const resp = err.response?.data;
-      const newErrs = {};
+    // ✅ success message
+    const msg = await getInfoText(address.id ? "IA004" : "IA001");
+    setSuccessMsg(msg);
 
-      if (resp && typeof resp === "object") {
-        for (const k of Object.keys(resp)) {
-          const v = resp[k];
+    // ✅ FORCE redirect to profile page
+    setTimeout(() => {
+      window.location.replace(redirectTo);
+    }, 700);
 
-          if (Array.isArray(v)) {
-            newErrs[k] = v[0];
-          } else if (typeof v === "string") {
-            const code = v.trim();
-            if (
-              tables.user_error.some((item) => item.error_code === code)
-            ) {
-              newErrs[k] = await getErrorText(code);
-            } else newErrs[k] = v;
-          }
-        }
+  } catch (err) {
+    console.error("SAVE FAILED:", err?.response?.data || err);
 
-        // Backend field-level uniqueness mapping
-        if (resp?.username) {
-          newErrs.username = await getErrorText("EP016");
-        }
-        if (resp?.email) {
-          newErrs.email = await getErrorText("ES003");
-        }
-      } else {
-        newErrs.general = "Failed to save data.";
-      }
-
-      setErrors(newErrs);
-    } finally {
-      setSaving(false);
+    if (err?.response?.data) {
+      setErrors({ general: "Validation failed. Please check fields." });
+    } else {
+      setErrors({ general: "Server error. Try again." });
     }
-  };
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ------------------ LOGOUT ------------------
   const handleLogout = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/auth/messages/");
+      const res = await fetch(`${API_URL}/api/auth/messages/`);
       if (res.ok) {
         const data = await res.json();
         localStorage.setItem("user_error", JSON.stringify(data.user_error || []));
@@ -645,4 +634,4 @@ export default function EditProfilePage() {
       </div>
     </div>
   );
-}
+} 
